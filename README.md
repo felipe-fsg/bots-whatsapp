@@ -66,11 +66,7 @@ TEST_DATABASE_URL=postgres://... npm test
 
 ## Colocar no servidor
 
-1. Num VPS com Docker, clone o repositório e crie o `.env` a partir do `.env.example`.
-2. Aponte o domínio (`DOMINIO`) para o IP do servidor.
-3. `docker compose up -d --build` (o Caddy cuida do HTTPS).
-4. Cadastre o bot: `docker compose exec app npx tsx scripts/seed-splinter.ts /caminho/arquivo.json`.
-   O comando mostra o endereço do webhook.
-5. Na AvisaAPI, troque o webhook do número para esse endereço.
-
-Rodar o cadastro de novo com o arquivo alterado atualiza o desafio sem duplicar nada.
+Passo a passo completo na Hetzner: [docs/hetzner.md](docs/hetzner.md). Resumo: num Ubuntu 24.04 com
+acesso root, `bash scripts/instalar-servidor.sh` instala Docker, baixa o código, cria o `.env` e sobe
+app + Postgres + Caddy (HTTPS automático, com domínio `sslip.io` se você não tiver um). Depois,
+`bash scripts/cadastrar.sh arquivo.json` cadastra o bot e mostra o endereço do webhook para colar na AvisaAPI.

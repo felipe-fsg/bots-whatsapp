@@ -163,6 +163,8 @@ if (process.argv[1]?.endsWith('seed-splinter.ts')) {
   await migrate(sql, console.log);
   const ids = await seedSplinter(sql, JSON.parse(await readFile(file, 'utf8')));
   console.log('Pronto. Endereço do webhook para colar na AvisaAPI:');
-  console.log(`  https://SEU_DOMINIO/webhook/avisa/${ids.connectionId}?key=SEU_WEBHOOK_SECRET`);
+  const domain = process.env.DOMINIO ?? 'SEU_DOMINIO';
+  const secret = process.env.WEBHOOK_SECRET ?? 'SEU_WEBHOOK_SECRET';
+  console.log(`  https://${domain}/webhook/avisa/${ids.connectionId}?key=${secret}`);
   await sql.end();
 }
