@@ -1,0 +1,39 @@
+{
+  "cliente": "Felipe",
+  "conexao": {
+    "nome": "Número do Felipe (AvisaAPI)",
+    "url_base": "https://www.avisaapi.com.br/api",
+    "variavel_do_token": "AVISA_TOKEN_FELIPE",
+    "repassar_para": "https://recursos-roboticos.app.n8n.cloud/webhook/COLE_AQUI",
+    "repassar_so_estes_grupos": []
+  },
+  "bot": { "nome": "Mestre Splinter", "modulo": "splinter", "grupo": "120363000000000000@g.us" },
+  "admins": [{ "nome": "Admin Exemplo", "telefone": "5511999990000" }],
+  "desafio": {
+    "nome": "Desafio de Exemplo",
+    "inicio": "2026-11-01",
+    "fim": "2026-11-30",
+    "status": "rascunho",
+    "horario_limite": "23:59",
+    "exigir_localizacao_no_treino": true,
+    "prazo_localizacao_min": 10,
+    "raio_metros": 150,
+    "tipos_de_local": ["gym", "fitness_center", "park"],
+    "confirmar_validos_no_grupo": false,
+    "max_treinos_semana": 5,
+    "bonus_dupla": 1,
+    "ia_nas_fotos": true,
+    "exigir_pose_do_dia": true,
+    "resumo_4h": true,
+    "mensagens_ao_longo_do_dia": true,
+    "intervalo_mensagens_horas": 1
+  },
+  "pontuacao": [
+    { "categoria": "Treino", "hashtag": "#treino", "tipo": "treino", "pontos": 3, "max_por_dia": 1 },
+    { "categoria": "Alimentação", "hashtag": "#comida", "tipo": "comida", "pontos": 1, "max_por_dia": 1 },
+    { "categoria": "Pose do dia", "hashtag": "#pose", "tipo": "pose", "pontos": 1, "max_por_dia": 1 }
+  ],
+  "participantes": [{ "nome": "Exemplo Silva", "telefone": "5511999990000", "nome_no_ranking": "Exemplo", "equipe": "Dupla Exemplo" }],
+  "locais": [{ "telefone": "5511999990000", "nome": "Academia do condomínio", "lat": -23.5505, "lng": -46.6333 }],
+  "alimentos": [{ "nome": "Batata frita", "classificacao": "nao_saudavel" }]
+}

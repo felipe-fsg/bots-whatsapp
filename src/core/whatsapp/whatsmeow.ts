@@ -1,0 +1,89 @@
+import type { InboundMessage } from '../types.js';
+import { digits } from '../phone.js';
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type Json = any;
+
+/** Tira as "cascas" que o WhatsApp põe em volta da mensagem (temporária, visualização única...). */
+function unwrap(message: Json): Json {
+  let m = message ?? {};
+  for (let i = 0; i < 4; i++) {
+    const inner =
+      m.ephemeralMessage?.message ??
+      m.viewOnceMessage?.message ??
+      m.viewOnceMessageV2?.message ??
+      m.viewOnceMessageV2Extension?.message ??
+      m.documentWithCaptionMessage?.message ??
+      m.editedMessage?.message;
+    if (!inner) break;
+    m = inner;
+  }
+  return m;
+}
+
+function quotedText(q: Json): string {
+  if (!q) return '';
+  const m = unwrap(q);
+  return String(m.conversation ?? m.extendedTextMessage?.text ?? m.imageMessage?.caption ?? '').trim();
+}
+
+/**
+ * Converte o evento de mensagem do whatsmeow (formato que a AvisaAPI manda em
+ * body.jsonData) para InboundMessage. Devolve null se não for mensagem.
+ */
+export function parseWhatsmeowEvent(raw: Json, image?: { data: Buffer; mime: string }): InboundMessage | null {
+  const ev = raw?.event ?? raw;
+  const info = ev?.Info;
+  if (!info?.ID || !info?.Chat) return null;
+
+  const m = unwrap(ev.Message);
+  const img = m.imageMessage;
+  const loc = m.locationMessage ?? m.liveLocationMessage;
+  const ext = m.extendedTextMessage;
+  const ctx = ext?.contextInfo ?? img?.contextInfo ?? loc?.contextInfo ?? {};
+
+  const sender = String(info.Sender ?? '');
+  const senderAlt = String(info.SenderAlt ?? '');
+  const phoneJid = [senderAlt, sender].find((j) => j.endsWith('@s.whatsapp.net')) ?? '';
+  const lid = [sender, senderAlt].find((j) => j.endsWith('@lid'));
+
+  const type: InboundMessage['type'] = img ? 'image' : loc ? 'location' : m.conversation || ext ? 'text' : 'other';
+
+  const msg: InboundMessage = {
+    id: String(info.ID),
+    chatJid: String(info.Chat),
+    isGroup: info.IsGroup === true || String(info.Chat).endsWith('@g.us'),
+    fromMe: info.IsFromMe === true,
+    senderPhone: digits(phoneJid),
+    pushName: String(info.PushName ?? ''),
+    timestamp: validDate(info.Timestamp),
+    type,
+    text: String(img?.caption ?? m.conversation ?? ext?.text ?? '').trim(),
+    mentions: [...new Set<string>((ctx.mentionedJID ?? []).map(String))],
+  };
+  if (lid) msg.senderLid = lid;
+  if (img) {
+    msg.image = { sha256: String(img.fileSHA256 ?? ''), mime: String(img.mimetype ?? image?.mime ?? 'image/jpeg') };
+    if (image?.data) msg.image.data = image.data;
+  }
+  if (loc && typeof loc.degreesLatitude === 'number' && typeof loc.degreesLongitude === 'number') {
+    msg.location = { lat: loc.degreesLatitude, lng: loc.degreesLongitude };
+  }
+  if (ctx.stanzaID) {
+    msg.quoted = {
+      messageId: String(ctx.stanzaID),
+      participant: String(ctx.participant ?? ''),
+      text: quotedText(ctx.quotedMessage),
+    };
+    const ql = ctx.quotedMessage ? unwrap(ctx.quotedMessage).locationMessage : undefined;
+    if (typeof ql?.degreesLatitude === 'number' && typeof ql?.degreesLongitude === 'number') {
+      msg.quoted.location = { lat: ql.degreesLatitude, lng: ql.degreesLongitude };
+    }
+  }
+  return msg;
+}
+
+function validDate(v: unknown): Date {
+  const d = new Date(String(v ?? ''));
+  return Number.isNaN(d.getTime()) ? new Date() : d;
+}

@@ -1,0 +1,45 @@
+# Sobe o núcleo e o Postgres num servidor só.
+# Uso: cp .env.example .env (e preencha), depois: docker compose up -d --build
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://bots:${POSTGRES_PASSWORD}@db:5432/bots
+    ports:
+      - "127.0.0.1:3000:3000" # só local; o Caddy abaixo publica com HTTPS
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bots
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: bots
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bots"]
+      interval: 5s
+      retries: 10
+
+  # HTTPS automático (Let's Encrypt). Troque DOMINIO no .env pelo seu domínio apontado para o servidor.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    command: caddy reverse-proxy --from ${DOMINIO} --to app:3000
+    volumes:
+      - caddy:/data
+    depends_on:
+      - app
+
+volumes:
+  pgdata:
+  caddy:
