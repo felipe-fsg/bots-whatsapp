@@ -10,7 +10,11 @@ REPO=github.com/felipe-fsg/bots-whatsapp
 echo "==> Instalando Docker, git e firewall"
 apt-get update -qq
 apt-get install -y -qq ca-certificates curl git ufw openssl >/dev/null
-command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh
+if ! command -v docker >/dev/null; then
+  # instalador oficial; se ele ainda não aceitar a versão do Ubuntu, usa o Docker do próprio Ubuntu
+  curl -fsSL https://get.docker.com | sh || apt-get install -y -qq docker.io docker-compose-v2 docker-buildx
+fi
+docker compose version >/dev/null 2>&1 || apt-get install -y -qq docker-compose-v2
 ufw allow OpenSSH >/dev/null; ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null; ufw --force enable >/dev/null
 
 if [ ! -d "$DIR/.git" ]; then
