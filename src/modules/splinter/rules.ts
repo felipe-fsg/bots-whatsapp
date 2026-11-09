@@ -82,11 +82,15 @@ export type Command =
   | { type: 'aprovar'; note: string }
   | { type: 'recusar'; note: string }
   | { type: 'equipe'; name: string }
-  | { type: 'meulocal'; name: string };
+  | { type: 'meulocal'; name: string }
+  | { type: 'motivacao' }
+  | { type: 'ajuda' };
 
 /** Comandos de texto. '!' ainda é aceito nos comandos antigos. */
 export function parseCommand(text: string): Command | null {
   const t = text.trim();
+  if (/^[#!]motiva(c|ç)(a|ã)o(?![\p{L}\p{N}])/iu.test(t)) return { type: 'motivacao' };
+  if (/^[#!](ajuda|comandos)\b/i.test(t)) return { type: 'ajuda' };
   if (/^[#!]ranking\b/i.test(t)) return { type: 'ranking' };
   if (/^[#!]equipes\b/i.test(t)) return { type: 'equipes' };
   if (/^[#!]regras\b/i.test(t)) return { type: 'regras' };

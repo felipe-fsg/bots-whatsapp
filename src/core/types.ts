@@ -64,8 +64,8 @@ export interface ImageInput {
 }
 
 export interface AiClient {
-  /** Gera texto. `search` liga a pesquisa no Google (quando o modelo aceita). */
-  text(prompt: string, opts?: { system?: string; temperature?: number; search?: boolean }): Promise<string>;
+  /** Gera texto. `search` liga a pesquisa no Google; `json` pede a resposta em JSON. */
+  text(prompt: string, opts?: { system?: string; temperature?: number; search?: boolean; json?: boolean }): Promise<string>;
   /** Analisa uma ou mais imagens com um pedido em texto. */
   vision(prompt: string, images: ImageInput[]): Promise<string>;
 }
@@ -99,6 +99,10 @@ export interface BotContext {
   /** Manda texto no grupo do bot. */
   reply(text: string): Promise<void>;
   isAdmin(phone: string): Promise<boolean>;
+  /** Fuso horário do grupo (bots.settings.timezone, padrão America/Sao_Paulo). */
+  timezone: string;
+  /** Nome que a pessoa usa no WhatsApp, aprendido das mensagens. */
+  nameOf(phone: string): Promise<string>;
 }
 
 export interface ContactResolver {
@@ -115,6 +119,10 @@ export interface ScheduledJob {
 
 export interface BotModule {
   id: string;
-  handle(ctx: BotContext, msg: InboundMessage): Promise<void>;
+  /**
+   * Trata a mensagem. Funções do núcleo (como a agenda) devolvem true quando a
+   * mensagem era delas, e aí o módulo do bot não é chamado.
+   */
+  handle(ctx: BotContext, msg: InboundMessage): Promise<void | boolean>;
   jobs?: ScheduledJob[];
 }

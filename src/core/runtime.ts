@@ -2,7 +2,7 @@ import type { Sql } from '../db.js';
 import type { AiClient, Bot, BotContext, BotModule, InboundMessage, Logger, PlacesClient, WhatsAppProvider } from './types.js';
 import { Contacts } from './contacts.js';
 import { KeyedQueue } from './queue.js';
-import { samePhone } from './phone.js';
+import { digits, last8, samePhone } from './phone.js';
 import { AvisaClient } from './whatsapp/avisa.js';
 
 interface ConnectionRow {
@@ -27,6 +27,8 @@ interface BotRow {
 export interface RuntimeDeps {
   sql: Sql;
   modules: BotModule[];
+  /** Funções do núcleo que valem para todos os bots (ex.: agenda). Rodam antes do módulo. */
+  features?: BotModule[];
   ai: AiClient;
   places: PlacesClient;
   log: Logger;
@@ -106,6 +108,13 @@ export class Runtime {
       log,
       now: this.now,
       reply: (text) => wa.sendText(bot.chatJid, text),
+      timezone: typeof bot.settings.timezone === 'string' ? bot.settings.timezone : 'America/Sao_Paulo',
+      nameOf: async (phone) => {
+        const rows = await sql<{ push_name: string; phone: string }[]>`
+          select push_name, phone from wa_people where connection_id = ${conn.id} and right(phone, 8) = ${last8(phone)}
+          order by updated_at desc limit 1`;
+        return rows[0]?.push_name ?? '';
+      },
       isAdmin: async (phone) => {
         const admins = await sql<{ phone: string }[]>`select phone from bot_admins where bot_id = ${bot.id}`;
         return admins.some((a) => samePhone(a.phone, phone));
@@ -151,7 +160,16 @@ export class Runtime {
     void this.queue.run(msg.chatJid, async () => {
       try {
         if (!msg.senderPhone && msg.senderLid) msg.senderPhone = await contacts.phoneOf(msg.senderLid, msg.chatJid);
-        await module.handle(this.context(bot), msg);
+        if (msg.senderPhone && msg.pushName) {
+          await this.deps.sql`
+            insert into wa_people (connection_id, phone, push_name) values (${conn.id}, ${digits(msg.senderPhone)}, ${msg.pushName})
+            on conflict (connection_id, phone) do update set push_name = excluded.push_name, updated_at = now()`;
+        }
+        const ctx = this.context(bot);
+        for (const feature of this.deps.features ?? []) {
+          if (await feature.handle(ctx, msg)) return;
+        }
+        await module.handle(ctx, msg);
       } catch (err) {
         this.deps.log.error({ err: String(err), stack: (err as Error)?.stack, bot: bot.id, messageId: msg.id }, 'erro no módulo');
       }

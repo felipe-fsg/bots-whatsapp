@@ -4,6 +4,7 @@ import { Runtime } from '../src/core/runtime.js';
 import type { AiClient, GroupMember, NearbyPlace, PlacesClient, WhatsAppProvider } from '../src/core/types.js';
 import { parseWhatsmeowEvent } from '../src/core/whatsapp/whatsmeow.js';
 import { modules } from '../src/modules/index.js';
+import { features } from '../src/features/index.js';
 
 export const DB_URL = process.env.TEST_DATABASE_URL ?? 'postgres://postgres@localhost:5433/bots_test';
 export const GROUP = '120363423993886664@g.us';
@@ -150,6 +151,7 @@ export async function world(opts: { challenge?: Record<string, unknown> } = {}):
   const runtime = new Runtime({
     sql,
     modules,
+    features,
     ai,
     places,
     log: { info() {}, warn() {}, error: (o) => console.error(o) },

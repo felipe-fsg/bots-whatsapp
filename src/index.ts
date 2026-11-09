@@ -8,6 +8,7 @@ import { Gemini } from './core/ai/gemini.js';
 import { GooglePlaces } from './core/places.js';
 import { buildServer } from './server.js';
 import { modules } from './modules/index.js';
+import { features } from './features/index.js';
 
 const config = loadConfig();
 const log = pino({ level: config.LOG_LEVEL });
@@ -17,12 +18,13 @@ await migrate(sql, (m) => log.info(m));
 const runtime = new Runtime({
   sql,
   modules,
+  features,
   ai: new Gemini(config.GEMINI_API_KEY, config.GEMINI_MODEL),
   places: new GooglePlaces(config.GOOGLE_MAPS_API_KEY),
   log,
 });
 
-const crons = config.SCHEDULER === 'on' ? startScheduler(runtime, modules, log) : [];
+const crons = config.SCHEDULER === 'on' ? startScheduler(runtime, modules, log, features) : [];
 
 // Limpeza diária: a lista de mensagens já processadas só precisa dos últimos dias.
 const cleanup = setInterval(

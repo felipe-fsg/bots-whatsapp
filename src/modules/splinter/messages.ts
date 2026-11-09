@@ -111,7 +111,7 @@ export function rulesText(ch: Challenge, rules: Rule[]): string {
   L.push('', '🔎 *Revisão*');
   L.push('• Check-ins com dúvida ficam "em revisão" e um admin aprova ou recusa. Você recebe o resultado aqui no grupo.');
   L.push('', '💬 *Comandos de todos*');
-  L.push('• #ranking - ranking individual', '• #equipes - ranking das equipes', '• ?alimento - diz se um alimento é saudável. Ex.: ?granola', '• #regras - estas regras');
+  L.push('• #ranking - ranking individual', '• #equipes - ranking das equipes', '• ?alimento - diz se um alimento é saudável. Ex.: ?granola', '• #motivação - uma palavra do Mestre Splinter para você', '• #agenda - eventos do grupo', '• #regras - estas regras');
   L.push('', '🛡️ *Comandos dos admins*');
   L.push('• #inscrever - responda à mensagem com o nome da pessoa. Para corrigir o nome: #inscrever Nome Sobrenome');
   L.push('• #equipe Nome da Equipe @pessoa1 @pessoa2 - monta ou troca uma equipe');
@@ -125,3 +125,24 @@ export function rulesText(ch: Challenge, rules: Rule[]): string {
 }
 
 export const onlyAdmin = (what: string) => `🛡️ Só os admins podem ${what}.`;
+
+/** #ajuda: comandos que valem a qualquer momento, com ou sem desafio. */
+export function helpText(): string {
+  return [
+    '🐀 *Comandos do Mestre Splinter*',
+    '',
+    '💬 *Para todos, a qualquer momento*',
+    '• #motivação - uma palavra do mestre para você',
+    '• ?alimento - diz se é saudável. Ex.: ?tapioca',
+    '• #agenda - próximos eventos do grupo',
+    '• #comparecer nome do evento - confirma sua presença',
+    '• #desistir nome do evento - tira seu nome da lista',
+    '',
+    '🏋️ *Durante o desafio*',
+    '• #regras, #ranking e #equipes',
+    '',
+    '🛡️ *Admins*',
+    '• #agendar - responda à sugestão de evento (ou: #agendar Nome | 15/11 19h | Local)',
+    '• #cancelarevento nome do evento',
+  ].join('\n');
+}

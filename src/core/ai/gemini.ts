@@ -30,12 +30,16 @@ export class Gemini implements AiClient {
       .trim();
   }
 
-  text(prompt: string, opts: { system?: string; temperature?: number; search?: boolean } = {}): Promise<string> {
+  text(prompt: string, opts: { system?: string; temperature?: number; search?: boolean; json?: boolean } = {}): Promise<string> {
     return this.generate({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       ...(opts.system ? { systemInstruction: { parts: [{ text: opts.system }] } } : {}),
       ...(opts.search ? { tools: [{ google_search: {} }] } : {}),
-      generationConfig: { temperature: opts.temperature ?? 0.7, maxOutputTokens: 4096 },
+      generationConfig: {
+        temperature: opts.temperature ?? 0.7,
+        maxOutputTokens: 4096,
+        ...(opts.json ? { responseMimeType: 'application/json' } : {}),
+      },
     });
   }
 

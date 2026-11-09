@@ -70,3 +70,10 @@ ${data}`;
 export function whatsappFormat(text: string): string {
   return text.replace(/\*\*/g, '*').trim();
 }
+
+export function motivationPrompt(name: string, hour: number, facts: string): string {
+  return `${name} mandou #motivação no grupo agora, às ${hour}h, pedindo uma palavra do mestre. Escreva uma mensagem curta (2 a 4 linhas) só para essa pessoa, chamando pelo nome. Se os dados mostrarem progresso, reconheça; se não, encoraje sem cobrar. Adapte ao horário. Varie o estilo e evite frases prontas. Sem listas.
+
+Dados:
+${facts}`;
+}

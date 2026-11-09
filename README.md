@@ -26,6 +26,15 @@ agendador (croner) ──▶ tarefas de cada módulo (resumo às 4h, localizaç�
 - Para criar um módulo novo: um arquivo em `src/modules/<nome>/index.ts` que exporta um `BotModule`
   (`handle` para mensagens e `jobs` para agendamentos) e uma linha em `src/modules/index.ts`.
 
+## Funções do núcleo (todos os bots)
+
+Ficam em `src/features/` e rodam antes do módulo do bot, em qualquer grupo, com ou sem desafio.
+
+- **Agenda de eventos** (`src/features/agenda`): alguém sugere um evento no grupo; um admin responde
+  com `#agendar` e a IA lê nome, data, hora, local e quem organiza (ou direto:
+  `#agendar Nome | 15/11 19h | Local`). Todos podem `#agenda`, `#comparecer nome` e `#desistir nome`;
+  admins podem `#cancelarevento nome`. O evento sai da lista no dia seguinte à data.
+
 ## Mestre Splinter
 
 | O quê | Onde |
@@ -37,7 +46,8 @@ agendador (croner) ──▶ tarefas de cada módulo (resumo às 4h, localizaç�
 | Resumo às 4h, mensagens ao longo do dia, localização vencida | `src/modules/splinter/jobs.ts` |
 | Tabelas | `migrations/002_splinter.sql` |
 
-Comandos: `#ranking`, `#equipes`, `#regras`, `?alimento`, `#meulocal Nome` (respondendo à própria
+Comandos para todos, a qualquer momento: `#motivação`, `?alimento`, `#ajuda`.
+Durante o desafio: `#ranking`, `#equipes`, `#regras`, `#meulocal Nome` (respondendo à própria
 localização) e, para admins, `#inscrever`, `#equipe Nome @a @b`, `#posedodia`, `#pendentes`,
 `#aprovar`, `#recusar motivo`.
 

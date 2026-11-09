@@ -1,7 +1,7 @@
 import type { BotContext, BotModule, InboundMessage } from '../../core/types.js';
 import { distanceM } from '../../core/geo.js';
 import { samePhone } from '../../core/phone.js';
-import { localDay, localTime } from '../../core/time.js';
+import { local, localDay, localTime } from '../../core/time.js';
 import { SplinterRepo } from './repo.js';
 import {
   POSE_TAG,
@@ -30,6 +30,10 @@ export const splinter: BotModule = {
     const command = msg.type === 'text' ? parseCommand(msg.text) : null;
 
     if (command) {
+      // estes valem para todo mundo do grupo, com ou sem desafio rolando
+      if (command.type === 'motivacao') return motivate(ctx, repo, msg);
+      if (command.type === 'alimento') return answerFood(ctx, repo, await repo.currentChallenge(ctx.bot.id), command.food);
+      if (command.type === 'ajuda') return ctx.reply(M.helpText());
       const ch = await repo.currentChallenge(ctx.bot.id);
       if (ch) await runCommand(ctx, repo, ch, msg, command);
       return;
@@ -179,21 +183,20 @@ async function runCommand(ctx: BotContext, repo: SplinterRepo, ch: Challenge, ms
       return ctx.reply(M.teamRankingText(ch.name, await repo.teamRanking(ch.id, ch.team_bonus_points)));
     case 'regras':
       return ctx.reply(M.rulesText(ch, await repo.rules(ch.id)));
-    case 'alimento':
-      return answerFood(ctx, repo, ch, cmd.food);
     case 'meulocal':
       return saveOwnPlace(ctx, repo, ch, msg, cmd.name);
   }
 
   // daqui para baixo, só admins
-  const what = {
+  const what: Record<string, string> = {
     inscrever: 'inscrever participantes',
     pendentes: 'revisar check-ins',
     aprovar: 'revisar check-ins',
     recusar: 'revisar check-ins',
     equipe: 'montar equipes',
-  }[cmd.type];
-  if (!(await ctx.isAdmin(msg.senderPhone))) return ctx.reply(M.onlyAdmin(what));
+  };
+  if (!what[cmd.type]) return;
+  if (!(await ctx.isAdmin(msg.senderPhone))) return ctx.reply(M.onlyAdmin(what[cmd.type]!));
 
   switch (cmd.type) {
     case 'inscrever':
@@ -208,15 +211,41 @@ async function runCommand(ctx: BotContext, repo: SplinterRepo, ch: Challenge, ms
   }
 }
 
-async function answerFood(ctx: BotContext, repo: SplinterRepo, ch: Challenge, food: string) {
+async function answerFood(ctx: BotContext, repo: SplinterRepo, ch: Challenge | null, food: string) {
   let text: string;
   try {
-    text = await ctx.ai.text(P.foodQuestionPrompt(food, await repo.foods(ch.id)), { search: true, temperature: 0.3 });
+    const foods = ch ? await repo.foods(ch.id) : [];
+    text = await ctx.ai.text(P.foodQuestionPrompt(food, foods), { search: true, temperature: 0.3 });
   } catch (err) {
     ctx.log.warn({ err: String(err) }, 'IA falhou na pergunta de alimento');
     text = '';
   }
   await ctx.reply(`🥗 *${food}*\n${P.whatsappFormat(text || 'Não consegui responder agora. Tente de novo em alguns minutos.')}`);
+}
+
+async function motivate(ctx: BotContext, repo: SplinterRepo, msg: InboundMessage) {
+  const ch = await repo.activeChallenge(ctx.bot.id);
+  const p = ch ? await repo.participantByPhone(ch.id, msg.senderPhone) : null;
+  const name = p ? displayName(p) : (await ctx.nameOf(msg.senderPhone)) || msg.pushName || 'jovem guerreiro';
+  let facts = 'Não há desafio rolando agora no grupo.';
+  if (ch && p) {
+    const ranking = await repo.ranking(ch.id);
+    const pos = ranking.findIndex((r) => r.name === name);
+    const todayCats = (await repo.validCheckins(ch.id, localDay(ctx.now(), ch.timezone), localDay(ctx.now(), ch.timezone)))
+      .filter((c) => c.name === name)
+      .map((c) => c.category);
+    facts = `Desafio ${ch.name} em andamento. ${name} tem ${ranking[pos]?.points ?? 0} pontos (${pos + 1}º de ${ranking.length}). Check-ins válidos hoje: ${todayCats.join(', ') || 'nenhum ainda'}.`;
+  } else if (ch) {
+    facts = `Desafio ${ch.name} em andamento, mas ${name} não está inscrito.`;
+  }
+  const hour = local(ctx.now(), ctx.timezone).hour;
+  let text = '';
+  try {
+    text = P.whatsappFormat(await ctx.ai.text(P.motivationPrompt(name, hour, facts), { system: P.SPLINTER_PERSONA, temperature: 1 }));
+  } catch (err) {
+    ctx.log.warn({ err: String(err) }, 'IA falhou na motivação');
+  }
+  await ctx.reply(text || `🐀 ${name}, o bambu que se curva ao vento não quebra. Um treino de cada vez, meu aluno. 🥋`);
 }
 
 async function saveOwnPlace(ctx: BotContext, repo: SplinterRepo, ch: Challenge, msg: InboundMessage, name: string) {
