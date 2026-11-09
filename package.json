@@ -9,7 +9,7 @@
     "migrate": "tsx src/migrate.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "seed": "tsx scripts/seed-splinter.ts"
+    "seed": "tsx scripts/cadastrar.ts"
   },
   "dependencies": {
     "@fastify/multipart": "^9.4.0",

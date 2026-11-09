@@ -1,0 +1,12 @@
+{
+  "cliente": "Felipe",
+  "conexao": {
+    "nome": "Número do Felipe (AvisaAPI)",
+    "url_base": "https://www.avisaapi.com.br/api",
+    "variavel_do_token": "AVISA_TOKEN_FELIPE",
+    "repassar_para": null,
+    "repassar_so_estes_grupos": []
+  },
+  "bot": { "nome": "Rolês da Turma", "modulo": "geral", "grupo": "COLE_AQUI_O_CODIGO_DO_GRUPO@g.us" },
+  "admins": [{ "nome": "Admin Exemplo", "telefone": "5511999990000" }]
+}

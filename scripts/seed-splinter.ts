@@ -1,25 +1,13 @@
 /**
  * Cadastra (ou atualiza) um bot Splinter a partir de um arquivo JSON.
- * Uso: npm run seed -- caminho/do/arquivo.json
- * Veja o formato em seed/exemplo-splinter.json. Rodar de novo atualiza sem duplicar.
+ * Formato em seed/exemplo-splinter.json. Quem roda é scripts/cadastrar.ts.
  */
-import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
-import { connect, type Sql } from '../src/db.js';
-import { migrate } from '../src/migrate.js';
+import type { Sql } from '../src/db.js';
 import { digits } from '../src/core/phone.js';
+import { BaseSeed, upsertBase } from './seed-base.js';
 
-const Seed = z.object({
-  cliente: z.string(),
-  conexao: z.object({
-    nome: z.string(),
-    url_base: z.string().default('https://www.avisaapi.com.br/api'),
-    variavel_do_token: z.string(),
-    repassar_para: z.string().nullish(),
-    repassar_so_estes_grupos: z.array(z.string()).default([]),
-  }),
-  bot: z.object({ nome: z.string(), modulo: z.literal('splinter').default('splinter'), grupo: z.string().endsWith('@g.us') }),
-  admins: z.array(z.object({ nome: z.string(), telefone: z.string() })).default([]),
+const Seed = BaseSeed.extend({
   desafio: z.object({
     nome: z.string(),
     inicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -59,31 +47,9 @@ const Seed = z.object({
 export async function seedSplinter(sql: Sql, input: unknown): Promise<{ botId: string; challengeId: string; connectionId: string }> {
   const s = Seed.parse(input);
   return sql.begin(async (tx) => {
-    const tenant =
-      (await tx`select id from tenants where name = ${s.cliente}`)[0] ?? (await tx`insert into tenants (name) values (${s.cliente}) returning id`)[0]!;
-
-    const connRow = {
-      label: s.conexao.nome,
-      base_url: s.conexao.url_base,
-      token_env: s.conexao.variavel_do_token,
-      forward_url: s.conexao.repassar_para ?? null,
-      forward_chats: s.conexao.repassar_so_estes_grupos,
-    };
-    const existingConn = (await tx`select id from wa_connections where token_env = ${connRow.token_env}`)[0];
-    const conn = existingConn
-      ? (await tx`update wa_connections set ${tx(connRow)} where id = ${existingConn.id} returning id`)[0]!
-      : (await tx`insert into wa_connections ${tx(connRow)} returning id`)[0]!;
-
-    const [bot] = await tx`
-      insert into bots (tenant_id, connection_id, name, module, chat_jid)
-      values (${tenant.id}, ${conn.id}, ${s.bot.nome}, ${s.bot.modulo}, ${s.bot.grupo})
-      on conflict (connection_id, chat_jid) do update set name = excluded.name, module = excluded.module, active = true
-      returning id`;
-
-    for (const a of s.admins) {
-      await tx`insert into bot_admins (bot_id, phone, name) values (${bot!.id}, ${digits(a.telefone)}, ${a.nome})
-        on conflict (bot_id, phone) do update set name = excluded.name`;
-    }
+    const { botId, connectionId } = await upsertBase(tx, { ...s, bot: { ...s.bot, modulo: 'splinter' } });
+    const bot = { id: botId };
+    const conn = { id: connectionId };
 
     const d = s.desafio;
     const chRow = {
@@ -151,20 +117,4 @@ export async function seedSplinter(sql: Sql, input: unknown): Promise<{ botId: s
     }
     return { botId: bot!.id, challengeId: ch.id, connectionId: conn.id };
   });
-}
-
-if (process.argv[1]?.endsWith('seed-splinter.ts')) {
-  const file = process.argv[2];
-  if (!file || !process.env.DATABASE_URL) {
-    console.error('Uso: DATABASE_URL=... npm run seed -- arquivo.json');
-    process.exit(1);
-  }
-  const sql = connect(process.env.DATABASE_URL);
-  await migrate(sql, console.log);
-  const ids = await seedSplinter(sql, JSON.parse(await readFile(file, 'utf8')));
-  console.log('Pronto. Endereço do webhook para colar na AvisaAPI:');
-  const domain = process.env.DOMINIO ?? 'SEU_DOMINIO';
-  const secret = process.env.WEBHOOK_SECRET ?? 'SEU_WEBHOOK_SECRET';
-  console.log(`  https://${domain}/webhook/avisa/${ids.connectionId}?key=${secret}`);
-  await sql.end();
 }

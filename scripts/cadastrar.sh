@@ -5,5 +5,5 @@ set -euo pipefail
 FILE=${1:?Informe o arquivo JSON}
 cd "$(dirname "$0")/.."
 docker compose cp "$FILE" app:/tmp/cadastro.json
-docker compose exec app npx tsx scripts/seed-splinter.ts /tmp/cadastro.json
+docker compose exec app npx tsx scripts/cadastrar.ts /tmp/cadastro.json
 docker compose exec app rm -f /tmp/cadastro.json
