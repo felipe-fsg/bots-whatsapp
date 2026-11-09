@@ -20,6 +20,7 @@ export function helpText(mascot: string): string {
     '• #agendar - responda à sugestão do rolê (ou: #agendar Nome | 15/11 19h | Local)',
     '• #cancelarevento nome do evento',
     '• #mascote Nome do personagem - troca o mascote (#mascote padrão volta ao original)',
+    '• #boasvindas - mostra ou troca a mensagem para quem entra no grupo',
   ].join('\n');
 }
 

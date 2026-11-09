@@ -147,5 +147,6 @@ export function helpText(): string {
     '• #agendar - responda à sugestão de evento (ou: #agendar Nome | 15/11 19h | Local)',
     '• #cancelarevento nome do evento',
     '• #mascote Nome do personagem - troca o mascote (#mascote padrão volta ao Mestre Splinter)',
+    '• #boasvindas - mostra ou troca a mensagem para quem entra no grupo',
   ].join('\n');
 }

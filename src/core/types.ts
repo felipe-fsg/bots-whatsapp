@@ -11,7 +11,8 @@ export interface InboundMessage {
   senderLid?: string;
   pushName: string;
   timestamp: Date;
-  type: 'text' | 'image' | 'location' | 'other';
+  /** 'join': gente nova entrou no grupo (lista em `joined`). */
+  type: 'text' | 'image' | 'location' | 'join' | 'other';
   /** Texto da mensagem ou legenda da foto. */
   text: string;
   image?: {
@@ -32,6 +33,8 @@ export interface InboundMessage {
   };
   /** JIDs marcados com @ (podem ser @lid). */
   mentions: string[];
+  /** Quem entrou no grupo (JIDs, podem ser @lid), quando type = 'join'. */
+  joined?: string[];
 }
 
 export interface Bot {

@@ -33,6 +33,8 @@ function quotedText(q: Json): string {
  */
 export function parseWhatsmeowEvent(raw: Json, image?: { data: Buffer; mime: string }): InboundMessage | null {
   const ev = raw?.event ?? raw;
+  const join = parseGroupJoin(ev);
+  if (join) return join;
   const info = ev?.Info;
   if (!info?.ID || !info?.Chat) return null;
 
@@ -81,6 +83,32 @@ export function parseWhatsmeowEvent(raw: Json, image?: { data: Buffer; mime: str
     }
   }
   return msg;
+}
+
+/**
+ * Evento GroupInfo do whatsmeow com gente entrando no grupo:
+ * { JID: '...@g.us', Sender, SenderPN, Timestamp, Join: ['...@lid'], JoinReason }.
+ */
+function parseGroupJoin(ev: Json): InboundMessage | null {
+  const jid = (j: Json) => (j && typeof j === 'object' && j.User ? `${j.User}@${j.Server}` : String(j ?? ''));
+  const joined: string[] = (Array.isArray(ev?.Join) ? ev.Join : []).map(jid).filter(Boolean);
+  const chat = String(ev?.JID ?? ev?.Chat ?? '');
+  if (!joined.length || !chat.endsWith('@g.us')) return null;
+  const at = validDate(ev.Timestamp);
+  const by = [ev.SenderPN, ev.Sender].map((j) => String(j ?? '')).find((j) => j.endsWith('@s.whatsapp.net')) ?? '';
+  return {
+    id: `join:${chat}:${at.getTime()}:${joined.join(',')}`.slice(0, 250),
+    chatJid: chat,
+    isGroup: true,
+    fromMe: false,
+    senderPhone: digits(by),
+    pushName: String(ev.Notify ?? ''),
+    timestamp: at,
+    type: 'join',
+    text: '',
+    mentions: [],
+    joined,
+  };
 }
 
 function validDate(v: unknown): Date {

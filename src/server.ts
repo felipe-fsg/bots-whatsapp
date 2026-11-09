@@ -68,7 +68,16 @@ export function buildServer(runtime: Runtime, opts: { secret: string; logger?: P
         return reply.code(400).send({ ok: false, error: 'jsonData inválido' });
       }
       const msg = parseWhatsmeowEvent(raw, payload.file);
-      if (!msg) return { ok: true, result: 'ignored' };
+      if (!msg) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const r: any = raw;
+        const ev = r?.event ?? r;
+        if (ev && typeof ev === 'object' && !ev.Info) {
+          // Eventos que não são mensagem: registra o formato para conhecermos o que a AvisaAPI manda.
+          req.log.info({ type: r?.type ?? ev?.type ?? null, keys: Object.keys(ev).slice(0, 15) }, 'evento ignorado');
+        }
+        return { ok: true, result: 'ignored' };
+      }
 
       const result = await runtime.handle(req.params.connectionId, msg, async (url) => {
         const form = new FormData();
