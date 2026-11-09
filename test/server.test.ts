@@ -35,6 +35,14 @@ describe('webhook da AvisaAPI', () => {
 
     const json = await app.inject({ method: 'POST', url: `${url}?key=${SECRET}`, payload: { jsonData: JSON.stringify(event({ phone: '1', at: '2026-11-09T12:00:00Z', chat: 'outro@g.us', text: 'oi' })) } });
     expect(json.json()).toEqual({ ok: true, result: 'ignored' });
+    // formulário simples e texto puro também são aceitos
+    const ev2 = JSON.stringify(event({ id: 'F1', phone: '5511911111111', at: '2026-11-10T12:00:00Z', text: '#ranking' }));
+    const form = await app.inject({ method: 'POST', url: `${url}?key=${SECRET}`, headers: { 'content-type': 'application/x-www-form-urlencoded' }, payload: new URLSearchParams({ jsonData: ev2 }).toString() });
+    expect(form.json()).toEqual({ ok: true, result: 'handled' });
+    const ev3 = JSON.stringify(event({ id: 'F2', phone: '5511911111111', at: '2026-11-10T12:00:00Z', text: '#ranking' }));
+    const plain = await app.inject({ method: 'POST', url: `${url}?key=${SECRET}`, headers: { 'content-type': 'text/plain' }, payload: ev3 });
+    expect(plain.json()).toEqual({ ok: true, result: 'handled' });
+    await w.runtime.idle();
     await app.close();
   });
 });

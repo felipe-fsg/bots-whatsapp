@@ -20,6 +20,18 @@ export function buildServer(runtime: Runtime, opts: { secret: string; logger?: P
   const app = Fastify({ ...(opts.logger ? { loggerInstance: opts.logger } : {}), bodyLimit: 20 * 1024 * 1024 });
   void app.register(multipart, { limits: { fileSize: 20 * 1024 * 1024, files: 1 } });
 
+  // A AvisaAPI pode mandar o evento como formulário simples ou com outro Content-Type: aceitamos todos.
+  app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_req, body, done) => {
+    done(null, Object.fromEntries(new URLSearchParams(String(body))));
+  });
+  app.addContentTypeParser('*', { parseAs: 'string' }, (_req, body, done) => {
+    try {
+      done(null, JSON.parse(String(body)));
+    } catch {
+      done(null, { raw: String(body) });
+    }
+  });
+
   app.get('/health', async () => ({ ok: true }));
 
   // A AvisaAPI manda um POST por evento: campo jsonData (texto JSON do whatsmeow) e, quando há mídia, o arquivo "file".
@@ -40,8 +52,13 @@ export function buildServer(runtime: Runtime, opts: { secret: string; logger?: P
         }
       } else {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const body: any = req.body ?? {};
-        payload.jsonData = typeof body.jsonData === 'string' ? body.jsonData : JSON.stringify(body.jsonData ?? body);
+        let body: any = req.body ?? {};
+        if (typeof body === 'string') body = { raw: body }; // text/plain
+        req.log.info({ contentType: req.headers['content-type'], keys: Object.keys(body).slice(0, 10) }, 'webhook sem multipart');
+        if (typeof body.jsonData === 'string') payload.jsonData = body.jsonData;
+        else if (body.jsonData) payload.jsonData = JSON.stringify(body.jsonData);
+        else if (typeof body.raw === 'string') payload.jsonData = body.raw;
+        else payload.jsonData = JSON.stringify(body);
       }
 
       let raw: unknown;
