@@ -165,7 +165,7 @@ export class Runtime {
       this.deps.log.warn({ bot: row.id, module: row.module }, 'módulo desconhecido');
       return 'ignored';
     }
-    if (msg.fromMe && !module.acceptsFromMe?.(msg)) return 'ignored';
+    if (msg.fromMe && msg.type !== 'join' && !module.acceptsFromMe?.(msg)) return 'ignored';
 
     const fresh = await this.deps.sql`
       insert into processed_messages (provider_msg_id, bot_id) values (${msg.id}, ${row.id})

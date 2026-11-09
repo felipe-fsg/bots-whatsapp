@@ -39,6 +39,24 @@ export function parseWhatsmeowEvent(raw: Json, image?: { data: Buffer; mime: str
   if (!info?.ID || !info?.Chat) return null;
 
   const m = unwrap(ev.Message);
+  // Quem adiciona alguém e compartilha o histórico manda este aviso com o LID de quem entrou.
+  const receivers = m.messageHistoryNotice?.messageHistoryMetadata?.historyReceivers;
+  if (Array.isArray(receivers) && receivers.length && String(info.Chat).endsWith('@g.us')) {
+    return {
+      // O mesmo ID vem antes em outra mensagem técnica; o prefixo evita que esta seja tida como repetida.
+      id: `join:${info.ID}`,
+      chatJid: String(info.Chat),
+      isGroup: true,
+      fromMe: info.IsFromMe === true,
+      senderPhone: '',
+      pushName: '',
+      timestamp: validDate(info.Timestamp),
+      type: 'join',
+      text: '',
+      mentions: [],
+      joined: receivers.map(String),
+    };
+  }
   const img = m.imageMessage;
   const loc = m.locationMessage ?? m.liveLocationMessage;
   const ext = m.extendedTextMessage;

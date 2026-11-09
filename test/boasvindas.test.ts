@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { parseWhatsmeowEvent } from '../src/core/whatsapp/whatsmeow.js';
-import { DEFAULT_WELCOME, prettyPhone } from '../src/features/boasvindas/index.js';
+import { DEFAULT_WELCOME, checkMembers, prettyPhone } from '../src/features/boasvindas/index.js';
 import { GROUP, world, type World } from './helpers.js';
 
 describe('boas-vindas', () => {
@@ -47,6 +47,46 @@ describe('boas-vindas', () => {
     await w.send({ phone: '5511900000001', at, text: '#boasvindas ligar' });
     await join(['5511933334444@s.whatsapp.net']);
     expect(w.wa.last()).toBe(DEFAULT_WELCOME.replace('{nome}', '+55 11 93333-4444'));
+  });
+
+  it('confere a lista de membros: na primeira vez só anota, depois dá boas-vindas a quem é novo', async () => {
+    await w.runtime.activeBots();
+    const bot = (await w.runtime.activeBots())[0]!;
+    const ctx = w.runtime.context(bot);
+    w.wa.members = [{ jid: '1@lid', lid: '1@lid', phone: '5511911111111' }];
+    await checkMembers(ctx);
+    expect(w.wa.sent).toHaveLength(0);
+
+    w.wa.members.push({ jid: '2@lid', lid: '2@lid', phone: '5511922223333' });
+    await checkMembers(ctx);
+    expect(w.wa.last()).toContain('+55 11 92222-3333');
+    await checkMembers(ctx);
+    expect(w.wa.sent).toHaveLength(1);
+
+    // saiu e voltou: boas-vindas de novo
+    w.wa.members.pop();
+    await checkMembers(ctx);
+    w.wa.members.push({ jid: '2@lid', lid: '2@lid', phone: '5511922223333' });
+    await checkMembers(ctx);
+    expect(w.wa.sent).toHaveLength(2);
+  });
+
+  it('usa o aviso de histórico compartilhado com quem entrou, sem repetir na conferência', async () => {
+    w.wa.members = [{ jid: '9@lid', lid: '9@lid', phone: '5511988887777' }];
+    const raw = {
+      event: {
+        Info: { ID: 'ABC', Chat: GROUP, IsGroup: true, IsFromMe: false, Sender: '5@lid', SenderAlt: '5511900000001@s.whatsapp.net', Timestamp: '2026-11-09T12:00:00Z' },
+        Message: { messageHistoryNotice: { messageHistoryMetadata: { historyReceivers: ['9@lid'], messageCount: 100 } } },
+      },
+    };
+    const msg = parseWhatsmeowEvent(raw)!;
+    expect(msg).toMatchObject({ type: 'join', joined: ['9@lid'], id: 'join:ABC' });
+    await w.runtime.handle(w.connectionId, msg, async () => {});
+    await w.runtime.idle();
+    expect(w.wa.last()).toContain('+55 11 98888-7777');
+    const bot = (await w.runtime.activeBots())[0]!;
+    await checkMembers(w.runtime.context(bot));
+    expect(w.wa.sent).toHaveLength(1);
   });
 
   it('formata telefones', () => {

@@ -50,14 +50,69 @@ export function welcomeText(template: string, name: string): string {
   return template.includes('{nome}') ? template.replaceAll('{nome}', name) : `${name}\n\n${template}`;
 }
 
+/** Telefone (ou LID) de um membro, usado como chave em group_members. */
+async function memberKey(ctx: BotContext, jid: string, chatJid: string): Promise<{ key: string; phone: string }> {
+  const phone = jid.endsWith('@s.whatsapp.net') ? digits(jid) : await ctx.contacts.phoneOf(jid, chatJid).catch(() => '');
+  return { key: phone || jid, phone };
+}
+
+/**
+ * Marca o membro como recebido e devolve true se ele ainda não tinha ganhado boas-vindas.
+ * Quem já estava no grupo quando o bot começou a acompanhar não recebe.
+ */
+async function claim(ctx: BotContext, key: string): Promise<boolean> {
+  const rows = await ctx.sql`
+    insert into group_members (bot_id, member_key, welcomed_at) values (${ctx.bot.id}, ${key}, now())
+    on conflict (bot_id, member_key) do nothing returning member_key`;
+  return rows.length > 0;
+}
+
+async function welcome(ctx: BotContext, cfg: WelcomeSettings, phone: string): Promise<void> {
+  // Quem volta para o grupo pode já ter nome conhecido; senão, mostramos o telefone.
+  const name = (phone && (await ctx.nameOf(phone))) || prettyPhone(phone) || 'pessoa nova';
+  await ctx.reply(welcomeText(cfg.text, name));
+}
+
 async function greet(ctx: BotContext, msg: InboundMessage): Promise<void> {
   const cfg = await load(ctx);
-  if (!cfg.on) return;
   for (const jid of msg.joined ?? []) {
-    const phone = jid.endsWith('@s.whatsapp.net') ? digits(jid) : await ctx.contacts.phoneOf(jid, msg.chatJid).catch(() => '');
-    // Quem volta para o grupo pode já ter nome conhecido; senão, mostramos o telefone.
-    const name = (phone && (await ctx.nameOf(phone))) || prettyPhone(phone) || 'pessoa nova';
-    await ctx.reply(welcomeText(cfg.text, name));
+    const { key, phone } = await memberKey(ctx, jid, msg.chatJid);
+    if ((await claim(ctx, key)) && cfg.on) await welcome(ctx, cfg, phone);
+  }
+}
+
+/**
+ * A AvisaAPI não avisa quando alguém entra pelo link. Então, de tempos em tempos,
+ * o bot compara a lista de membros com a anterior e dá boas-vindas a quem é novo.
+ */
+export async function checkMembers(ctx: BotContext): Promise<void> {
+  const members = await ctx.wa.listGroupMembers(ctx.bot.chatJid);
+  if (!members.length) return; // falha ou grupo não encontrado: não mexe em nada
+  const keys = [...new Set(members.map((m) => digits(m.phone) || m.lid || m.jid).filter(Boolean))];
+  const counted = await ctx.sql<{ n: number }[]>`select count(*)::int as n from group_members where bot_id = ${ctx.bot.id} and welcomed_at is null`;
+  const n = counted[0]?.n ?? 0;
+
+  if (n === 0) {
+    // Primeira vez (ninguém anotado como já presente): só anota quem já está no grupo.
+    await ctx.sql`insert into group_members (bot_id, member_key) select ${ctx.bot.id}, unnest(${keys}::text[]) on conflict do nothing`;
+    return;
+  }
+  // Quem entrou pelo aviso de histórico pode ter sido anotado pelo LID: passa a usar o telefone.
+  for (const m of members) {
+    const phone = digits(m.phone);
+    if (m.lid && phone) {
+      await ctx.sql`update group_members set member_key = ${phone} where bot_id = ${ctx.bot.id} and member_key = ${m.lid}
+        and not exists (select 1 from group_members where bot_id = ${ctx.bot.id} and member_key = ${phone})`;
+    }
+  }
+  // Quem saiu é esquecido; se voltar, ganha boas-vindas de novo.
+  await ctx.sql`delete from group_members where bot_id = ${ctx.bot.id} and not (member_key = any(${keys}::text[]))`;
+  await ctx.sql`update group_members set seen_at = now() where bot_id = ${ctx.bot.id}`;
+
+  const cfg = await load(ctx);
+  for (const m of members) {
+    const key = digits(m.phone) || m.lid || m.jid;
+    if (key && (await claim(ctx, key)) && cfg.on) await welcome(ctx, cfg, digits(m.phone));
   }
 }
 
@@ -98,6 +153,7 @@ async function command(ctx: BotContext, msg: InboundMessage, arg: string): Promi
 /** Boas-vindas: quando alguém entra no grupo, pede a apresentação. Função do núcleo. */
 export const boasvindas: BotModule = {
   id: 'boasvindas',
+  jobs: [{ name: 'membros-novos', cron: '*/2 * * * *', run: checkMembers }],
   async handle(ctx, msg) {
     if (msg.type === 'join') {
       await greet(ctx, msg);
