@@ -35,6 +35,11 @@ Ficam em `src/features/` e rodam antes do módulo do bot, em qualquer grupo, com
   `#agendar Nome | 15/11 19h | Local`). Todos podem `#agenda`, `#comparecer nome` e `#desistir nome`;
   admins podem `#cancelarevento nome`. O evento sai da lista no dia seguinte à data.
 
+- **Mascote** (`src/features/mascote`): cada grupo tem um personagem. `#mascote` mostra o atual; admins
+  trocam com `#mascote Nome do personagem` (a IA cria a personalidade, guardada em `bot_mascots`) e
+  `#mascote padrão` volta ao do módulo (`defaultMascot`). Quem começa a mensagem pelo nome do mascote
+  conversa com ele. Tudo que a IA escreve no grupo usa a personalidade do mascote (`ctx.mascot()`).
+
 ## Mestre Splinter
 
 | O quê | Onde |

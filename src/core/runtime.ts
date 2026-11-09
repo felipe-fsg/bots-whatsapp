@@ -39,6 +39,12 @@ export interface RuntimeDeps {
   fetchFn?: typeof fetch;
 }
 
+export const DEFAULT_MASCOT = {
+  name: 'Mascote',
+  persona:
+    'Você é o mascote de um grupo de WhatsApp: simpático, bem-humorado e prestativo. Escreva em português do Brasil, em mensagens curtas. Formatação de WhatsApp: *negrito* com um asterisco só, sem títulos com # e sem links. Nunca critique ou exponha alguém pelo nome.',
+};
+
 /** Repasse de uma mensagem para o sistema antigo (ex.: n8n), no formato que chegou. */
 export type Forwarder = (url: string) => Promise<void>;
 
@@ -109,6 +115,11 @@ export class Runtime {
       now: this.now,
       reply: (text) => wa.sendText(bot.chatJid, text),
       timezone: typeof bot.settings.timezone === 'string' ? bot.settings.timezone : 'America/Sao_Paulo',
+      mascot: async () => {
+        const rows = await sql<{ name: string; persona: string }[]>`
+          select name, persona from bot_mascots where bot_id = ${bot.id}`;
+        return rows[0] ?? this.modules.get(bot.module)?.defaultMascot ?? DEFAULT_MASCOT;
+      },
       nameOf: async (phone) => {
         const rows = await sql<{ push_name: string; phone: string }[]>`
           select push_name, phone from wa_people where connection_id = ${conn.id} and right(phone, 8) = ${last8(phone)}

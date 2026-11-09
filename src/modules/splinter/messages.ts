@@ -135,6 +135,7 @@ export function helpText(): string {
     '• #motivação - uma palavra do mestre para você',
     '• ?alimento - diz se é saudável. Ex.: ?tapioca',
     '• #agenda - próximos eventos do grupo',
+    '• #mascote - mostra quem é o mascote. Para falar com ele, comece a mensagem pelo nome dele',
     '• #comparecer nome do evento - confirma sua presença',
     '• #desistir nome do evento - tira seu nome da lista',
     '',
@@ -144,5 +145,6 @@ export function helpText(): string {
     '🛡️ *Admins*',
     '• #agendar - responda à sugestão de evento (ou: #agendar Nome | 15/11 19h | Local)',
     '• #cancelarevento nome do evento',
+    '• #mascote Nome do personagem - troca o mascote (#mascote padrão volta ao Mestre Splinter)',
   ].join('\n');
 }

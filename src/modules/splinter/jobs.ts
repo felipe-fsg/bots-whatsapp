@@ -75,7 +75,7 @@ async function mestreSplinter(ctx: BotContext): Promise<void> {
   const data = await splinterData(ctx, summary);
   if (!data) return;
   const prompt = summary ? P.summaryPrompt(data) : P.hourlyPrompt(hour, data);
-  const text = P.whatsappFormat(await ctx.ai.text(prompt, { system: P.SPLINTER_PERSONA, temperature: 1 }));
+  const text = P.whatsappFormat(await ctx.ai.text(prompt, { system: (await ctx.mascot()).persona, temperature: 1 }));
   if (text) await ctx.reply(text);
 }
 

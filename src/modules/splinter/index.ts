@@ -24,6 +24,7 @@ import { splinterJobs } from './jobs.js';
 
 export const splinter: BotModule = {
   id: 'splinter',
+  defaultMascot: { name: 'Mestre Splinter', persona: P.SPLINTER_PERSONA },
   jobs: splinterJobs,
   async handle(ctx, msg) {
     const repo = new SplinterRepo(ctx.sql);
@@ -241,7 +242,7 @@ async function motivate(ctx: BotContext, repo: SplinterRepo, msg: InboundMessage
   const hour = local(ctx.now(), ctx.timezone).hour;
   let text = '';
   try {
-    text = P.whatsappFormat(await ctx.ai.text(P.motivationPrompt(name, hour, facts), { system: P.SPLINTER_PERSONA, temperature: 1 }));
+    text = P.whatsappFormat(await ctx.ai.text(P.motivationPrompt(name, hour, facts), { system: (await ctx.mascot()).persona, temperature: 1 }));
   } catch (err) {
     ctx.log.warn({ err: String(err) }, 'IA falhou na motivação');
   }

@@ -1,5 +1,6 @@
 import type { BotModule } from '../core/types.js';
 import { agenda } from './agenda/index.js';
+import { mascote } from './mascote/index.js';
 
 /** Funções do núcleo: valem para todos os bots, qualquer que seja o módulo. */
-export const features: BotModule[] = [agenda];
+export const features: BotModule[] = [agenda, mascote];

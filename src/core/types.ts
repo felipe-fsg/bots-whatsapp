@@ -103,6 +103,8 @@ export interface BotContext {
   timezone: string;
   /** Nome que a pessoa usa no WhatsApp, aprendido das mensagens. */
   nameOf(phone: string): Promise<string>;
+  /** Mascote atual do grupo (o escolhido com #mascote ou o padrão do módulo). */
+  mascot(): Promise<Mascot>;
 }
 
 export interface ContactResolver {
@@ -117,8 +119,16 @@ export interface ScheduledJob {
   run(ctx: BotContext): Promise<void>;
 }
 
+export interface Mascot {
+  name: string;
+  /** Instruções de personalidade para a IA (vai como system prompt). */
+  persona: string;
+}
+
 export interface BotModule {
   id: string;
+  /** Personagem padrão dos bots deste módulo, até alguém trocar com #mascote. */
+  defaultMascot?: Mascot;
   /**
    * Trata a mensagem. Funções do núcleo (como a agenda) devolvem true quando a
    * mensagem era delas, e aí o módulo do bot não é chamado.
