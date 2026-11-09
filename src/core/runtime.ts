@@ -176,6 +176,7 @@ export class Runtime {
             insert into wa_people (connection_id, phone, push_name) values (${conn.id}, ${digits(msg.senderPhone)}, ${msg.pushName})
             on conflict (connection_id, phone) do update set push_name = excluded.push_name, updated_at = now()`;
         }
+        await this.logMessage(bot.id, msg);
         const ctx = this.context(bot);
         for (const feature of this.deps.features ?? []) {
           if (await feature.handle(ctx, msg)) return;
@@ -186,6 +187,18 @@ export class Runtime {
       }
     });
     return 'handled';
+  }
+
+  /** Guarda o texto da mensagem para o #resumo (sem mídia e sem coordenadas). */
+  private async logMessage(botId: string, msg: InboundMessage): Promise<void> {
+    const body =
+      msg.type === 'image' ? `[foto]${msg.text ? ` ${msg.text}` : ''}` : msg.type === 'location' ? '[localização]' : msg.text;
+    if (!body) return;
+    const name = msg.pushName || null;
+    await this.deps.sql`
+      insert into group_messages (bot_id, msg_id, sent_at, sender_phone, sender_name, text)
+      values (${botId}, ${msg.id}, ${msg.timestamp}, ${msg.senderPhone || null}, ${name}, ${body.slice(0, 2000)})
+      on conflict do nothing`;
   }
 
   /** Espera a fila esvaziar (testes e desligamento). */
