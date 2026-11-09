@@ -56,6 +56,8 @@ export interface GroupMember {
 
 export interface WhatsAppProvider extends WhatsAppSender {
   listGroupMembers(chatJid: string): Promise<GroupMember[]>;
+  /** Manda texto e devolve o id da mensagem enviada (vazio se o provedor não informar). */
+  sendTextWithId?(chatJid: string, text: string): Promise<string>;
 }
 
 export interface ImageInput {
@@ -98,6 +100,8 @@ export interface BotContext {
   now(): Date;
   /** Manda texto no grupo do bot. */
   reply(text: string): Promise<void>;
+  /** Manda texto no grupo e devolve o id da mensagem (para achar respostas a ela depois). */
+  replyWithId(text: string): Promise<string>;
   isAdmin(phone: string): Promise<boolean>;
   /** Fuso horário do grupo (bots.settings.timezone, padrão America/Sao_Paulo). */
   timezone: string;
@@ -135,4 +139,11 @@ export interface BotModule {
    */
   handle(ctx: BotContext, msg: InboundMessage): Promise<void | boolean>;
   jobs?: ScheduledJob[];
+  /** Funções do núcleo que este módulo usa (ids). Sem a lista, usa todas. */
+  features?: string[];
+  /**
+   * Mensagens do próprio número do bot são ignoradas, a não ser que o módulo
+   * aceite (ex.: quem usa o número do bot no celular e manda /duvida).
+   */
+  acceptsFromMe?(msg: InboundMessage): boolean;
 }

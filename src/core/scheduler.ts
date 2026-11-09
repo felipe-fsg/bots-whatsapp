@@ -16,7 +16,11 @@ export function startScheduler(
     for (const job of module.jobs ?? []) {
       crons.push(
         new Cron(job.cron, { timezone, protect: true, name: `${module.id}:${job.name}` }, async () => {
-          const bots = (await runtime.activeBots()).filter((b) => forAll || b.module === module.id);
+          const usesFeature = (b: { module: string }) => {
+            const list = modules.find((m) => m.id === b.module)?.features;
+            return !list || list.includes(module.id);
+          };
+          const bots = (await runtime.activeBots()).filter((b) => (forAll ? usesFeature(b) : b.module === module.id));
           for (const bot of bots) {
             try {
               await job.run(runtime.context(bot));

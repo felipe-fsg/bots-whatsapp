@@ -114,6 +114,11 @@ export class Runtime {
       log,
       now: this.now,
       reply: (text) => wa.sendText(bot.chatJid, text),
+      replyWithId: async (text) => {
+        if (wa.sendTextWithId) return wa.sendTextWithId(bot.chatJid, text);
+        await wa.sendText(bot.chatJid, text);
+        return '';
+      },
       timezone: typeof bot.settings.timezone === 'string' ? bot.settings.timezone : 'America/Sao_Paulo',
       mascot: async () => {
         const rows = await sql<{ name: string; persona: string }[]>`
@@ -154,13 +159,12 @@ export class Runtime {
       }
       return 'ignored';
     }
-    if (msg.fromMe) return 'ignored';
-
     const module = this.modules.get(row.module);
     if (!module) {
       this.deps.log.warn({ bot: row.id, module: row.module }, 'módulo desconhecido');
       return 'ignored';
     }
+    if (msg.fromMe && !module.acceptsFromMe?.(msg)) return 'ignored';
 
     const fresh = await this.deps.sql`
       insert into processed_messages (provider_msg_id, bot_id) values (${msg.id}, ${row.id})
@@ -179,6 +183,7 @@ export class Runtime {
         await this.logMessage(bot.id, msg);
         const ctx = this.context(bot);
         for (const feature of this.deps.features ?? []) {
+          if (module.features && !module.features.includes(feature.id)) continue;
           if (await feature.handle(ctx, msg)) return;
         }
         await module.handle(ctx, msg);

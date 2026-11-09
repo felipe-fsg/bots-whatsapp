@@ -29,6 +29,12 @@ export class AvisaClient implements WhatsAppProvider {
     await this.call('POST', '/actions/sendMessage', { number: chatJid, message: text });
   }
 
+  async sendTextWithId(chatJid: string, text: string): Promise<string> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r: any = await this.call('POST', '/actions/sendMessage', { number: chatJid, message: text });
+    return String(r?.data?.response?.data?.Id ?? r?.response?.data?.Id ?? r?.data?.Id ?? r?.id ?? r?.messageId ?? '');
+  }
+
   /** A AvisaAPI devolve todos os grupos do número; pode levar ~30 s. */
   async listGroupMembers(chatJid: string): Promise<GroupMember[]> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
