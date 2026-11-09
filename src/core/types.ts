@@ -55,12 +55,18 @@ export interface GroupMember {
   jid: string;
   lid?: string;
   phone: string;
+  /** Admin do grupo no WhatsApp (não confundir com admin do bot). */
+  admin?: boolean;
 }
 
 export interface WhatsAppProvider extends WhatsAppSender {
   listGroupMembers(chatJid: string): Promise<GroupMember[]>;
   /** Manda texto e devolve o id da mensagem enviada (vazio se o provedor não informar). */
   sendTextWithId?(chatJid: string, text: string): Promise<string>;
+  /** Manda texto marcando pessoas (@). Sem isso, o @telefone vai como texto comum. */
+  sendTextMentions?(chatJid: string, text: string, jids: string[]): Promise<void>;
+  /** Tira alguém do grupo (o número do bot precisa ser admin do grupo). */
+  removeParticipant?(chatJid: string, jid: string): Promise<void>;
 }
 
 export interface ImageInput {
@@ -73,6 +79,18 @@ export interface AiClient {
   text(prompt: string, opts?: { system?: string; temperature?: number; search?: boolean; json?: boolean }): Promise<string>;
   /** Analisa uma ou mais imagens com um pedido em texto. */
   vision(prompt: string, images: ImageInput[]): Promise<string>;
+  /** Responde pesquisando no Google e devolve também as páginas usadas. */
+  research(prompt: string, opts?: { system?: string }): Promise<WebAnswer>;
+}
+
+export interface WebSource {
+  title: string;
+  url: string;
+}
+
+export interface WebAnswer {
+  text: string;
+  sources: WebSource[];
 }
 
 export interface NearbyPlace {
@@ -81,8 +99,18 @@ export interface NearbyPlace {
   lng: number;
 }
 
+export interface PlaceResult {
+  name: string;
+  address: string;
+  rating?: number;
+  ratings?: number;
+  mapsUrl?: string;
+}
+
 export interface PlacesClient {
   nearby(lat: number, lng: number, radiusM: number, types: string[]): Promise<NearbyPlace[]>;
+  /** Busca lugares por texto ("restaurantes de sushi na Liberdade"). */
+  search(query: string, max?: number): Promise<PlaceResult[]>;
 }
 
 export interface Logger {

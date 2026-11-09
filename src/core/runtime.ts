@@ -12,6 +12,7 @@ interface ConnectionRow {
   token_env: string;
   forward_url: string | null;
   forward_chats: string[];
+  own_phone: string | null;
 }
 
 interface BotRow {
@@ -69,7 +70,7 @@ export class Runtime {
   private async load() {
     if (this.cache && Date.now() - this.cache.at < 30_000) return this.cache;
     const conns = await this.deps.sql<ConnectionRow[]>`
-      select id, provider, base_url, token_env, forward_url, forward_chats from wa_connections`;
+      select id, provider, base_url, token_env, forward_url, forward_chats, own_phone from wa_connections`;
     const bots = await this.deps.sql<BotRow[]>`
       select id, tenant_id, connection_id, name, module, chat_jid, settings from bots where active`;
     this.cache = { at: Date.now(), bots, conns: new Map(conns.map((c) => [c.id, c])) };
@@ -164,6 +165,11 @@ export class Runtime {
     if (!module) {
       this.deps.log.warn({ bot: row.id, module: row.module }, 'módulo desconhecido');
       return 'ignored';
+    }
+    if (msg.fromMe && msg.senderPhone && !conn.own_phone) {
+      // número do próprio bot: nunca entra no aviso de sumidos
+      conn.own_phone = digits(msg.senderPhone);
+      await this.deps.sql`update wa_connections set own_phone = ${conn.own_phone} where id = ${conn.id}`;
     }
     if (msg.fromMe && msg.type !== 'join' && !module.acceptsFromMe?.(msg)) return 'ignored';
 

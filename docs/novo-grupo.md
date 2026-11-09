@@ -17,5 +17,5 @@ Tipos de bot (`modulo`):
 
 | Módulo | Para quê | O que tem |
 |---|---|---|
-| `geral` | grupo de conversa, amigos, rolês | #resumo, #agenda, #mascote, #motivação, #ajuda |
+| `geral` | grupo de conversa, amigos, rolês | #resumo, #agenda, #mascote, #motivação, ?pesquisa, #ajuda |
 | `splinter` | desafio fitness | tudo do geral + check-ins, ranking, equipes, ?alimento |

@@ -45,6 +45,7 @@ export class AvisaClient implements WhatsAppProvider {
       jid: String(p.JID ?? ''),
       lid: p.LID ? String(p.LID) : undefined,
       phone: digits(p.PhoneNumber ?? p.JID),
+      admin: p.IsAdmin === true || p.IsSuperAdmin === true,
     }));
   }
 }
