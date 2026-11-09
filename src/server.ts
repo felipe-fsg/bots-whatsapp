@@ -79,6 +79,24 @@ export function buildServer(runtime: Runtime, opts: { secret: string; logger?: P
         return { ok: true, result: 'ignored' };
       }
 
+      if (msg.type === 'other') {
+        // Mensagem de tipo desconhecido: registra a estrutura para descobrirmos avisos do grupo (entradas etc.).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const r: any = raw;
+        const ev = r?.event ?? r;
+        const keys = Object.keys(ev?.Message ?? {});
+        const media = ['audioMessage', 'videoMessage', 'stickerMessage', 'documentMessage', 'reactionMessage', 'pollUpdateMessage'];
+        req.log.info(
+          {
+            infoType: ev?.Info?.Type ?? null,
+            mediaType: ev?.Info?.MediaType ?? null,
+            messageKeys: keys.slice(0, 10),
+            eventKeys: Object.keys(ev ?? {}).slice(0, 15),
+            ...(keys.some((k) => media.includes(k)) ? {} : { sample: payload.jsonData.slice(0, 2500) }),
+          },
+          'mensagem de tipo desconhecido',
+        );
+      }
       const result = await runtime.handle(req.params.connectionId, msg, async (url) => {
         const form = new FormData();
         form.set('jsonData', payload.jsonData);
