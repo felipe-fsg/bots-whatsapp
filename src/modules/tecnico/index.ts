@@ -44,6 +44,7 @@ export function helpText(): string {
     '• /duvida + sua pergunta: equipamento, modelo, código de erro e o que já foi feito. Ex.: /duvida 4008S dando F04 na desinfecção',
     '• #resumo - o que rolou no grupo hoje (#resumo ontem para o dia anterior)',
     '• #agenda - próximos eventos do grupo',
+    '• ?pesquisa + o que procurar - pesquisa na internet. Ex.: ?pesquisa manual da 5008S',
     '',
     '🛡️ *Sêniores* (respondendo à mensagem do bot)',
     '• /correto - confirma a resposta',
@@ -233,7 +234,7 @@ export function createTecnico(given?: TecnicoDeps): BotModule {
         'Você é o assistente técnico de um grupo de WhatsApp de técnicos de manutenção de equipamentos. Seja cordial, direto e profissional. Escreva em português do Brasil, em mensagens curtas. Formatação de WhatsApp: *negrito* com um asterisco só, sem títulos com # e sem links.',
     },
     // Num grupo de trabalho, o mascote não entra: só agenda e resumo.
-    features: ['agenda', 'resumo'],
+    features: ['agenda', 'resumo', 'pesquisa'],
     // Quem usa o próprio número do bot no celular também pode perguntar e revisar.
     acceptsFromMe: (msg) => msg.type === 'text' && parseTecnico(msg.text) !== null,
     async handle(ctx, msg) {

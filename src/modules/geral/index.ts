@@ -14,6 +14,7 @@ export function helpText(mascot: string): string {
     '• #comparecer nome do evento - confirma sua presença',
     '• #desistir nome do evento - tira seu nome da lista',
     '• #motivação - uma palavra do mascote para você',
+    '• ?pesquisa + o que procurar - pesquisa na internet. Ex.: ?pesquisa restaurantes de sushi na Liberdade',
     `• Para conversar com o mascote, comece a mensagem com "${mascot.split(' ').pop()}"`,
     '',
     '🛡️ *Admins*',

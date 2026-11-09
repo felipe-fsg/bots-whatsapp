@@ -39,6 +39,9 @@ Ficam em `src/features/` e rodam antes do módulo do bot, em qualquer grupo, com
   hoje; `#resumo ontem`, o dia anterior. O núcleo guarda só o texto das mensagens dos grupos atendidos
   (`group_messages`; foto vira "[foto] legenda", localização vira "[localização]") e apaga tudo com mais
   de 3 dias.
+- **Pesquisa na internet** (`src/features/pesquisa`): `?pesquisa texto` (ou `#pesquisa`). Pergunta por
+  lugares (restaurante, bar, farmácia, "onde comer"...) vai para o Google Maps (Places Text Search), que traz
+  nome, nota, endereço e link reais; o resto vai para o Gemini com a pesquisa do Google ligada, com até 3 fontes.
 - **Mascote** (`src/features/mascote`): cada grupo tem um personagem. `#mascote` mostra o atual; admins
   trocam com `#mascote Nome do personagem` (a IA cria a personalidade, guardada em `bot_mascots`) e
   `#mascote padrão` volta ao do módulo (`defaultMascot`). Quem começa a mensagem pelo nome do mascote

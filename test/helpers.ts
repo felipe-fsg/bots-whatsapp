@@ -1,7 +1,7 @@
 import { connect, type Sql } from '../src/db.js';
 import { migrate } from '../src/migrate.js';
 import { Runtime } from '../src/core/runtime.js';
-import type { AiClient, GroupMember, NearbyPlace, PlacesClient, WhatsAppProvider } from '../src/core/types.js';
+import type { AiClient, GroupMember, NearbyPlace, PlaceResult, PlacesClient, WebAnswer, WhatsAppProvider } from '../src/core/types.js';
 import { parseWhatsmeowEvent } from '../src/core/whatsapp/whatsmeow.js';
 import { modules } from '../src/modules/index.js';
 import { features } from '../src/features/index.js';
@@ -45,12 +45,24 @@ export class FakeAi implements AiClient {
     this.prompts.push(prompt);
     return this.visionAnswer;
   }
+  researchAnswer: WebAnswer | Error = { text: 'Resposta da pesquisa.', sources: [] };
+  async research(prompt: string) {
+    this.prompts.push(prompt);
+    if (this.researchAnswer instanceof Error) throw this.researchAnswer;
+    return this.researchAnswer;
+  }
 }
 
 export class FakePlaces implements PlacesClient {
   places: NearbyPlace[] = [];
   async nearby() {
     return this.places;
+  }
+  found: PlaceResult[] = [];
+  searches: string[] = [];
+  async search(query: string) {
+    this.searches.push(query);
+    return this.found;
   }
 }
 

@@ -73,6 +73,18 @@ export interface AiClient {
   text(prompt: string, opts?: { system?: string; temperature?: number; search?: boolean; json?: boolean }): Promise<string>;
   /** Analisa uma ou mais imagens com um pedido em texto. */
   vision(prompt: string, images: ImageInput[]): Promise<string>;
+  /** Responde pesquisando no Google e devolve também as páginas usadas. */
+  research(prompt: string, opts?: { system?: string }): Promise<WebAnswer>;
+}
+
+export interface WebSource {
+  title: string;
+  url: string;
+}
+
+export interface WebAnswer {
+  text: string;
+  sources: WebSource[];
 }
 
 export interface NearbyPlace {
@@ -81,8 +93,18 @@ export interface NearbyPlace {
   lng: number;
 }
 
+export interface PlaceResult {
+  name: string;
+  address: string;
+  rating?: number;
+  ratings?: number;
+  mapsUrl?: string;
+}
+
 export interface PlacesClient {
   nearby(lat: number, lng: number, radiusM: number, types: string[]): Promise<NearbyPlace[]>;
+  /** Busca lugares por texto ("restaurantes de sushi na Liberdade"). */
+  search(query: string, max?: number): Promise<PlaceResult[]>;
 }
 
 export interface Logger {

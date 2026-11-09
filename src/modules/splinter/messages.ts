@@ -134,6 +134,7 @@ export function helpText(): string {
     '💬 *Para todos, a qualquer momento*',
     '• #motivação - uma palavra do mestre para você',
     '• ?alimento - diz se é saudável. Ex.: ?tapioca',
+    '• ?pesquisa + o que procurar - pesquisa na internet. Ex.: ?pesquisa restaurantes de sushi na Liberdade',
     '• #resumo - o que rolou no grupo hoje (#resumo ontem para o dia anterior)',
     '• #agenda - próximos eventos do grupo',
     '• #mascote - mostra quem é o mascote. Para falar com ele, comece a mensagem pelo nome dele',
