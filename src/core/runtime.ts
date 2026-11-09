@@ -151,6 +151,7 @@ export class Runtime {
     await contacts.learn(msg.senderLid, msg.senderPhone).catch(() => {});
 
     const row = bots.find((b) => b.connection_id === connectionId && b.chat_jid === msg.chatJid);
+    if (msg.type === 'join') this.deps.log.info({ chat: msg.chatJid, joined: msg.joined?.length ?? 0, bot: row?.name ?? null }, 'entrada no grupo');
     if (!row) {
       const wanted = conn.forward_chats.length === 0 || conn.forward_chats.includes(msg.chatJid);
       if (conn.forward_url && forward && wanted) {
