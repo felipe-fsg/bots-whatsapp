@@ -22,6 +22,9 @@ export function helpText(mascot: string): string {
     '• #cancelarevento nome do evento',
     '• #mascote Nome do personagem - troca o mascote (#mascote padrão volta ao original)',
     '• #boasvindas - mostra ou troca a mensagem para quem entra no grupo',
+    '• #promover @pessoa / #demover @pessoa - dá ou tira a função de admin do bot (#admins lista)',
+    '• #ativarBAN / #desativarBAN - aviso semanal de quem está sumido há 7 dias (sai do grupo depois do 3º aviso)',
+    '• #curiar / #nãocuriar - liga ou desliga o pedido de fotos às 10h, 15h e 21h',
   ].join('\n');
 }
 

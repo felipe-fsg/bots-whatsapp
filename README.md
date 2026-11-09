@@ -42,6 +42,13 @@ Ficam em `src/features/` e rodam antes do módulo do bot, em qualquer grupo, com
 - **Pesquisa na internet** (`src/features/pesquisa`): `?pesquisa texto` (ou `#pesquisa`). Pergunta por
   lugares (restaurante, bar, farmácia, "onde comer"...) vai para o Google Maps (Places Text Search), que traz
   nome, nota, endereço e link reais; o resto vai para o Gemini com a pesquisa do Google ligada, com até 3 fontes.
+- **Moderação** (grupos de convivência; o módulo `tecnico` não usa):
+  - `src/features/inativos`: `#ativarBAN` / `#desativarBAN` (admins). Toda segunda, 12h, marca quem está há
+    mais de 7 dias sem mandar nada (tabela `member_activity`, só a data da última mensagem). Zera quando a
+    pessoa fala; quem continua sumido depois do 3º aviso é removido (`removeParticipant` do provedor) ou, se
+    o provedor não remover, o bot pede aos admins. Nunca avisa admins do grupo, admins do bot nem o próprio bot.
+  - `src/features/curiar`: `#curiar` / `#nãocuriar` (admins). Às 10h, 15h e 21h o mascote pede fotos.
+  - `src/features/admins`: `#promover @pessoa`, `#demover @pessoa` (admins) e `#admins`.
 - **Mascote** (`src/features/mascote`): cada grupo tem um personagem. `#mascote` mostra o atual; admins
   trocam com `#mascote Nome do personagem` (a IA cria a personalidade, guardada em `bot_mascots`) e
   `#mascote padrão` volta ao do módulo (`defaultMascot`). Quem começa a mensagem pelo nome do mascote
