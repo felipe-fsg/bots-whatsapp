@@ -19,9 +19,11 @@ export const SYSTEM = [
   '10. Se a ficha diz que dependia de foto/audio indisponivel, avise que o passo a passo pode estar incompleto.',
   '11. SEGURANCA (regra mais importante): nunca oriente desabilitar, jumpear ou contornar protecoes ou alarmes, pular o teste T1 ou liberar maquina com falha. Se o MANUAL citar jumper, ponte ou desativacao de alguma funcao como passo de diagnostico, nao transforme isso em instrucao: diga apenas que o manual descreve um procedimento de diagnostico em bancada (cite a pagina), que deve ser feito so com um senior, desfeito antes de qualquer uso em paciente e seguido de um T1 completo. Se uma ficha tiver ALERTA DE SEGURANCA, respeite-o. Sempre que o problema puder afetar o paciente (ar no circuito, fuga de sangue, temperatura, condutividade, pressoes, clamp), lembre que a maquina nao deve ser usada em paciente ate ser corrigida e testada.',
   '12. Calibracoes e resets: lembre de conferir com o manual de servico.',
+  '13. ESCOPO: a GSS NAO atende maquinas Gambro (exceto a osmose portatil Gambro WRO 300) nem Nipro Surdial, Surdial 55 e Surdial 55 Plus. Da Nipro, so a Diamax / Diamax Full. Se a pergunta for sobre equipamento fora do escopo, diga em uma ou duas linhas que esse equipamento nao e atendido pela base da GSS e peca para falar com um senior; nao responda o conteudo tecnico.',
+  '14. Se o tecnico mandou uma FOTO (tela, placa, peca), descreva em uma linha o que da para ver nela que importa para a duvida (codigo na tela, valor, componente) e use isso para escolher as fichas. Nao tire conclusoes que a foto nao mostra; se estiver ilegivel, peca outra foto.',
   '',
   'FORMATO (WhatsApp)',
-  '- Portugues do Brasil, com acentuacao correta, claro e direto, para tecnico de campo. No maximo uns 15 a 20 linhas.',
+  '- Portugues do Brasil, com acentuacao correta, claro e direto, para tecnico de campo. Uns 12 linhas, nunca mais de 15 (contando tudo). Va direto as causas e verificacoes mais provaveis (ate 3); nao repita a pergunta nem explique o que as fichas sao.',
   '- Comece pelo mais provavel. Use passos numerados quando for procedimento.',
   '- Negrito do WhatsApp e com UM asterisco: *assim*. Nao use #, tabelas nem dois asteriscos.',
   '- Cite de onde veio, de forma curta, ex.: (caso orientado por Rafael em 03/2023), (revisado por Rafael Zeni em 05/11/2026) ou (Lista de erros Fresenius 4008, p. 136).',
@@ -85,9 +87,15 @@ export function fichaText(f: Ficha): string {
   return '[' + m.id + '] (' + info.filter(Boolean).join('; ') + ')\n' + f.content;
 }
 
-export function userMessage(name: string, question: string, fichas: Ficha[]): string {
+export function userMessage(name: string, question: string, fichas: Ficha[], photo: 'sim' | 'perdida' | 'nao' = 'nao'): string {
   const ctx = fichas.map(fichaText).join('\n\n---\n\n');
-  return 'TECNICO: ' + name + '\nPERGUNTA: ' + (question || '(vazia)') + '\n\nFICHAS ENCONTRADAS NA BASE:\n\n' + (ctx || '(nenhuma)');
+  const foto =
+    photo === 'sim'
+      ? '\nFOTO: o tecnico mandou a foto anexa junto com a pergunta.'
+      : photo === 'perdida'
+        ? '\nFOTO: o tecnico mandou uma foto, mas ela nao chegou ao sistema. Avise em uma linha que nao foi possivel ver a foto.'
+        : '';
+  return 'TECNICO: ' + name + '\nPERGUNTA: ' + (question || '(vazia)') + foto + '\n\nFICHAS ENCONTRADAS NA BASE:\n\n' + (ctx || '(nenhuma)');
 }
 
 /** Separa o corpo da resposta e a linha final "FONTES: ...". */

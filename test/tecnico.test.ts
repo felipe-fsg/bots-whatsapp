@@ -6,6 +6,8 @@ import { features } from '../src/features/index.js';
 import { createTecnico, parseTecnico } from '../src/modules/tecnico/index.js';
 import type { Ficha, KnowledgeBase, ChatModel } from '../src/modules/tecnico/clients.js';
 import { splitSources, shortName } from '../src/modules/tecnico/prompt.js';
+import { Claude } from '../src/modules/tecnico/clients.js';
+import { carregar, parseCarga } from '../src/modules/tecnico/carga.js';
 import { FakeAi, FakePlaces, FakeWhatsApp, event, freshDb, type EventInput } from './helpers.js';
 
 const TEC = '120363413362471875@g.us';
@@ -34,8 +36,10 @@ class FakeKb implements KnowledgeBase {
 class FakeLlm implements ChatModel {
   reply = 'Confira a pressão do degas.\nFONTES: H00001';
   users: string[] = [];
-  async answer(_s: string, user: string) {
+  images: number[] = [];
+  async answer(_s: string, user: string, images: { data: Buffer }[] = []) {
     this.users.push(user);
+    this.images.push(images.length);
     return this.reply;
   }
 }
@@ -55,6 +59,47 @@ describe('parseTecnico', () => {
     expect(splitSources('Texto\nFONTES: nenhuma').sources).toEqual([]);
     expect(shortName('Rafael Zeni da Silva')).toBe('Rafael Zeni');
     expect(shortName('Felipe de Souza Gonçalves')).toBe('Felipe Souza');
+  });
+});
+
+describe('carga da base', () => {
+  it('lê lista, objeto com itens e JSONL, e aponta fichas sem id ou texto', () => {
+    const a = parseCarga(JSON.stringify([{ content: 'F07 Airdetector', metadata: { id: 'm00001', tipo: 'manual', pagina: 12 } }, { content: 'x' }]));
+    expect(a.fichas).toEqual([{ content: 'F07 Airdetector', metadata: { id: 'M00001', tipo: 'manual', pagina: 12 } }]);
+    expect(a.erros).toHaveLength(1);
+    const b = parseCarga('{"itens":[{"pageContent":"caso","id":"H1","tipo":"ficha"}]}');
+    expect(b.fichas[0]).toEqual({ content: 'caso', metadata: { id: 'H1', tipo: 'ficha' } });
+    expect(parseCarga('{"texto":"a","id":"H2"}\n{"texto":"b","id":"H3"}').fichas).toHaveLength(2);
+  });
+
+  it('grava em lotes, pula o que já existe e tenta de novo quando falha', async () => {
+    const saved: string[][] = [];
+    let falhas = 1;
+    const kb = {
+      existingIds: async (ids: string[]) => new Set(ids.filter((id) => id === 'M2')),
+      insertMany: async (items: { metadata: Record<string, unknown> }[]) => {
+        if (falhas-- > 0) throw new Error('429');
+        saved.push(items.map((i) => String(i.metadata.id)));
+      },
+    };
+    const fichas = ['M1', 'M2', 'M3'].map((id) => ({ content: id, metadata: { id } }));
+    const r = await carregar(kb as any, fichas, { lote: 2, esperaMs: 0 });
+    expect(r).toEqual({ gravadas: 2, puladas: 1 });
+    expect(saved).toEqual([['M1'], ['M3']]);
+  });
+
+  it('manda a foto para o Claude junto com o texto', async () => {
+    let body: any;
+    const fake = (async (_u: string, init: any) => {
+      body = JSON.parse(init.body);
+      return new Response(JSON.stringify({ content: [{ type: 'text', text: 'ok' }] }));
+    }) as unknown as typeof fetch;
+    const c = new Claude('k', 'modelo', fake);
+    await c.answer('sys', 'pergunta', [{ data: Buffer.from('abc'), mime: 'image/jpeg' }]);
+    expect(body.messages[0].content[0]).toEqual({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'YWJj' } });
+    expect(body.messages[0].content[1]).toEqual({ type: 'text', text: 'pergunta' });
+    await c.answer('sys', 'só texto');
+    expect(body.messages[0].content).toBe('só texto');
   });
 });
 
@@ -138,6 +183,19 @@ describe('bot técnico', () => {
     await send({ phone: '5511944444444', at: now.value.toISOString(), text: '/restaurar', quoted: { id: 'BOT1', participant: 'x@lid' } });
     expect(wa.last()).toContain('Resposta restaurada');
     expect((await sql`select status from tecnico_cards where bot_msg_id = 'BOT1'`)[0]!.status).toBe('corrigida');
+  });
+
+  it('responde /duvida na legenda da foto e avisa quando a foto não chegou', async () => {
+    await send({ phone: '5511933333333', name: 'Emerson', at: now.value.toISOString(), image: { sha: 'abc', caption: '/duvida que erro é esse?' } });
+    expect(wa.last()).toContain('*Dúvida de Emerson:* que erro é esse?');
+    expect(llm.users[0]).toContain('não chegou ao sistema'.normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+    expect(llm.images[0]).toBe(0);
+
+    const ev = event({ chat: TEC, phone: '5511933333333', at: now.value.toISOString(), image: { sha: 'def', caption: '/duvida e agora?' } });
+    await runtime.handle(conn, parseWhatsmeowEvent(ev, { data: Buffer.from('foto'), mime: 'image/jpeg' })!, async () => {});
+    await runtime.idle();
+    expect(llm.images[1]).toBe(1);
+    expect(llm.users[1]).toContain('foto anexa');
   });
 
   it('aceita /duvida do próprio número do bot, ignora o resto e não usa o mascote', async () => {
