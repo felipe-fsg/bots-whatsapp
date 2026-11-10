@@ -49,7 +49,7 @@ export function helpText(): string {
     '',
     '🛡️ *Sêniores* (respondendo à mensagem do bot)',
     '• /correto - confirma a resposta',
-    '• /corrigir texto - registra a orientação certa',
+    '• /corrigir texto - corrige só o que está errado (ex.: /corrigir o item 2 está errado, a pressão certa é -0,81). O resto da resposta continua valendo',
     '• /acrescentar texto - completa a resposta',
     '• /excluir - tira a resposta de uso (vai para a lixeira)',
     '• /restaurar - traz de volta uma resposta excluída',
@@ -196,9 +196,11 @@ async function review(ctx: BotContext, deps: TecnicoDeps, msg: InboundMessage, c
   } else if (cmd === 'corrigir') {
     status = 'corrigida';
     correction = text;
+    // O sênior escreve só o que está errado; o resto da resposta continua valendo.
     doc =
       q +
-      `ORIENTAÇÃO CORRETA DADA PELO SÊNIOR ${who} em ${today}:\n${text}\n\n(A resposta automática anterior a esta pergunta foi considerada incorreta por este sênior e não deve ser repetida.)`;
+      `RESPOSTA AUTOMÁTICA REVISADA PELO SÊNIOR ${who} em ${today}:\n${card.answer}\n\n` +
+      `CORREÇÃO DO SÊNIOR (vale mais que a resposta acima; o que ela contradiz está ERRADO e não deve ser repetido; o resto continua valendo):\n${text}`;
     confirm = `✅ *Correção registrada* por ${who} em ${today}:\n${text}`;
   } else {
     status = 'acrescentada';

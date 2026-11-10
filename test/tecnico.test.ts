@@ -163,6 +163,8 @@ describe('bot técnico', () => {
 
     await send({ phone: '5511944444444', at: now.value.toISOString(), text: '/corrigir era a V84', quoted: { id: 'BOT1', participant: 'x@lid' } });
     expect(wa.last()).toContain('*Correção registrada* por Rafael Zeni em 09/11/2026');
+    expect(kb.inserted[0]!.content).toContain('Confira a pressão do degas.');
+    expect(kb.inserted[0]!.content).toContain('CORREÇÃO DO SÊNIOR');
     expect(kb.inserted[0]!.metadata).toMatchObject({ id: `C${String(card!.id).padStart(5, '0')}`, tipo: 'card_revisado', situacao: 'confirmada' });
     const [after] = await sql`select status, correction, reviewed_at from tecnico_cards`;
     expect(after).toMatchObject({ status: 'corrigida', correction: 'era a V84' });
