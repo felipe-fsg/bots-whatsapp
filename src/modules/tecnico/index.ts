@@ -42,6 +42,7 @@ export function helpText(): string {
     '🔧 *Bot de dúvidas técnicas*',
     '',
     '• /duvida + sua pergunta: equipamento, modelo, código de erro e o que já foi feito. Ex.: /duvida 4008S dando F04 na desinfecção',
+    '• Também vale mandar uma *foto* (tela, placa) com /duvida na legenda',
     '• #resumo - o que rolou no grupo hoje (#resumo ontem para o dia anterior)',
     '• #agenda - próximos eventos do grupo',
     '• ?pesquisa + o que procurar - pesquisa na internet. Ex.: ?pesquisa manual da 5008S',
@@ -80,9 +81,12 @@ async function answer(ctx: BotContext, deps: TecnicoDeps, msg: InboundMessage, q
     .filter((m) => m.tipo === 'card_revisado' && m.situacao !== 'descartada')
     .map((m) => ({ id: String(m.id).toUpperCase(), by: String(m.revisado_por ?? ''), on: String(m.data_revisao ?? '') }));
 
+  const img = msg.type === 'image' ? msg.image : undefined;
+  const photo = img?.data ? 'sim' : msg.type === 'image' ? 'perdida' : 'nao';
+  const images = img?.data && /^image\/(jpeg|png|gif|webp)$/.test(img.mime) ? [{ data: img.data, mime: img.mime }] : [];
   let text: string;
   try {
-    text = await deps.llm.answer(SYSTEM, userMessage(name, question, valid));
+    text = await deps.llm.answer(SYSTEM, userMessage(name, question, valid, photo), images);
   } catch (err) {
     ctx.log.error({ err: String(err) }, 'Claude falhou');
     await ctx.reply('⚠️ Não consegui montar a resposta agora. Tente de novo em alguns minutos ou acione um sênior.');
@@ -236,7 +240,7 @@ export function createTecnico(given?: TecnicoDeps): BotModule {
     // Num grupo de trabalho, o mascote não entra: só agenda e resumo.
     features: ['agenda', 'resumo', 'pesquisa'],
     // Quem usa o próprio número do bot no celular também pode perguntar e revisar.
-    acceptsFromMe: (msg) => msg.type === 'text' && parseTecnico(msg.text) !== null,
+    acceptsFromMe: (msg) => (msg.type === 'text' || msg.type === 'image') && parseTecnico(msg.text) !== null,
     async handle(ctx, msg) {
       if (msg.type !== 'text' && msg.type !== 'image') return;
       const cmd = parseTecnico(msg.text);
