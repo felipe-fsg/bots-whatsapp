@@ -159,6 +159,10 @@ export class Runtime {
         forward(conn.forward_url).catch((err) => this.deps.log.warn({ err: String(err) }, 'falha ao repassar mensagem'));
         return 'forwarded';
       }
+      // Para cadastrar um grupo novo: alguém manda #codigogrupo nele e o código aparece no log.
+      if (msg.isGroup && /^#c[oó]digo ?grupo\b/i.test(msg.text.trim())) {
+        this.deps.log.info({ chat: msg.chatJid, conexao: conn.id }, 'código do grupo');
+      }
       return 'ignored';
     }
     const module = this.modules.get(row.module);

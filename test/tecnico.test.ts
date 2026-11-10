@@ -111,6 +111,7 @@ describe('bot técnico', () => {
   let runtime: Runtime;
   let conn: string;
   const now = { value: new Date('2026-11-09T12:00:00Z') };
+  const infos: Record<string, unknown>[] = [];
 
   async function send(e: EventInput & { fromMe?: boolean }) {
     const ev = event({ chat: TEC, ...e });
@@ -137,7 +138,7 @@ describe('bot técnico', () => {
       features,
       ai: new FakeAi(),
       places: new FakePlaces(),
-      log: { info() {}, warn() {}, error: (o) => console.error(o) },
+      log: { info: (o, m) => infos.push({ ...(o as object), msg: m }), warn() {}, error: (o) => console.error(o) },
       now: () => now.value,
       providerFor: () => wa,
     });
@@ -198,6 +199,13 @@ describe('bot técnico', () => {
     await runtime.idle();
     expect(llm.images[1]).toBe(1);
     expect(llm.users[1]).toContain('foto anexa');
+  });
+
+  it('anota no log o código de um grupo sem bot quando pedem #codigogrupo', async () => {
+    const other = '120363999999999999@g.us';
+    expect(await runtime.handle(conn, parseWhatsmeowEvent(event({ chat: other, phone: '5511933333333', at: now.value.toISOString(), text: 'oi' }))!)).toBe('ignored');
+    await runtime.handle(conn, parseWhatsmeowEvent(event({ chat: other, phone: '5511933333333', at: now.value.toISOString(), text: '#códigogrupo' }))!);
+    expect(infos.filter((i) => i.msg === 'código do grupo')).toEqual([expect.objectContaining({ chat: other })]);
   });
 
   it('aceita /duvida do próprio número do bot, ignora o resto e não usa o mascote', async () => {
