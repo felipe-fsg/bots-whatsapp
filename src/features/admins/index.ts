@@ -57,12 +57,33 @@ async function list(ctx: BotContext): Promise<void> {
   await ctx.reply(`🛡️ *Admins do bot*\n${names.map((n) => `• ${n}`).join('\n') || '• ninguém'}`);
 }
 
-/** #promover @pessoa, #demover @pessoa e #admins. Função do núcleo. */
+/** #ban respondendo à mensagem de alguém: tira a pessoa do grupo. */
+async function ban(ctx: BotContext, msg: InboundMessage): Promise<void> {
+  const jid = msg.quoted?.participant;
+  if (!jid) return ctx.reply('🚫 Use #ban *respondendo* (citando) a mensagem de quem vai sair do grupo.');
+  const phone = jid.endsWith('@s.whatsapp.net') ? digits(jid) : await ctx.contacts.phoneOf(jid, msg.chatJid).catch(() => '');
+  const [conn] = await ctx.sql<{ own_phone: string | null }[]>`select own_phone from wa_connections where id = ${ctx.bot.connectionId}`;
+  if (phone && conn?.own_phone && samePhone(phone, conn.own_phone)) return ctx.reply('🚫 Não posso tirar a mim mesmo do grupo. 😅');
+  if (phone && (await ctx.isAdmin(phone))) return ctx.reply('🚫 Essa pessoa é admin do bot. Use #demover antes, se for o caso.');
+  const who = phone ? await label(ctx, phone) : 'essa pessoa';
+  try {
+    if (!ctx.wa.removeParticipant) throw new Error('provedor não remove participantes');
+    await ctx.wa.removeParticipant(msg.chatJid, phone ? `${phone}@s.whatsapp.net` : jid);
+    await ctx.reply(`🚫 ${who} foi removido(a) do grupo.`);
+  } catch (err) {
+    ctx.log.warn({ err: String(err) }, 'não consegui remover no #ban');
+    await ctx.reply(
+      `🛡️ Não consegui remover ${who} sozinho (o número do bot precisa ser admin do grupo). Admins, removam pelo WhatsApp, por favor${phone ? ` (${prettyPhone(phone)})` : ''}.`,
+    );
+  }
+}
+
+/** #promover @pessoa, #demover @pessoa, #admins e #ban. Função do núcleo. */
 export const admins: BotModule = {
   id: 'admins',
   async handle(ctx, msg) {
     if (msg.type !== 'text') return false;
-    const m = /^[#!](promover|demover|admins)(?![\p{L}\p{N}])\s*([\s\S]*)$/iu.exec(msg.text.trim());
+    const m = /^[#!](promover|demover|admins|ban)(?![\p{L}\p{N}])\s*([\s\S]*)$/iu.exec(msg.text.trim());
     if (!m) return false;
     const cmd = m[1]!.toLowerCase();
     if (cmd === 'admins') {
@@ -70,10 +91,11 @@ export const admins: BotModule = {
       return true;
     }
     if (!(await ctx.isAdmin(msg.senderPhone))) {
-      await ctx.reply(adminOnly('promover ou demover admins'));
+      await ctx.reply(adminOnly(cmd === 'ban' ? 'remover pessoas do grupo' : 'promover ou demover admins'));
       return true;
     }
-    if (cmd === 'promover') await promote(ctx, msg, m[2] ?? '');
+    if (cmd === 'ban') await ban(ctx, msg);
+    else if (cmd === 'promover') await promote(ctx, msg, m[2] ?? '');
     else await demote(ctx, msg, m[2] ?? '');
     return true;
   },
