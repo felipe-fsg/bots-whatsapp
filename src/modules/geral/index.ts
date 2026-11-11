@@ -15,6 +15,7 @@ export function helpText(mascot: string): string {
     '• #desistir nome do evento - tira seu nome da lista',
     '• #motivação - uma palavra do mascote para você',
     '• ?pesquisa + o que procurar - pesquisa na internet. Ex.: ?pesquisa restaurantes de sushi na Liberdade',
+    '• #insta @usuario - coloca seu Instagram na lista do grupo (#removeinsta tira, #listainsta mostra todos)',
     `• Para conversar com o mascote, comece a mensagem com "${mascot.split(' ').pop()}"`,
     '',
     '🛡️ *Admins*',

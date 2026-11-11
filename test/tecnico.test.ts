@@ -214,6 +214,8 @@ describe('bot técnico', () => {
     expect(wa.sent).toHaveLength(1);
     await send({ phone: '5511933333333', at: now.value.toISOString(), text: '#mascote' });
     expect(wa.sent).toHaveLength(1);
+    await send({ phone: '5511933333333', at: now.value.toISOString(), text: '#listainsta' });
+    expect(wa.sent).toHaveLength(1); // grupo profissional: sem lista de Instagram
     await send({ phone: '5511933333333', at: now.value.toISOString(), text: '#agenda' });
     expect(wa.last()).toContain('agenda');
   });

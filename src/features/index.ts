@@ -7,6 +7,7 @@ import { pesquisa } from './pesquisa/index.js';
 import { inativos } from './inativos/index.js';
 import { curiar } from './curiar/index.js';
 import { admins } from './admins/index.js';
+import { instagram } from './instagram/index.js';
 
-/** Funções do núcleo: valem para todos os bots, qualquer que seja o módulo. */
-export const features: BotModule[] = [inativos, boasvindas, agenda, resumo, pesquisa, curiar, admins, mascote];
+/** Funções do núcleo. Um módulo pode limitar quais usa (o técnico, grupo profissional, só usa agenda, resumo e pesquisa). */
+export const features: BotModule[] = [inativos, boasvindas, agenda, resumo, pesquisa, curiar, admins, instagram, mascote];
