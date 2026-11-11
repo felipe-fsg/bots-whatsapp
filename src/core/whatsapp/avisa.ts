@@ -35,6 +35,18 @@ export class AvisaClient implements WhatsAppProvider {
     return String(r?.data?.response?.data?.Id ?? r?.response?.data?.Id ?? r?.data?.Id ?? r?.id ?? r?.messageId ?? '');
   }
 
+  /** Tira alguém do grupo (POST /group/update, action remove). O número do bot precisa ser admin do grupo. */
+  async removeParticipant(chatJid: string, jid: string): Promise<void> {
+    const participant = jid.includes('@') ? jid.replace(/:\d+(?=@)/, '') : `${digits(jid)}@s.whatsapp.net`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r: any = await this.call('POST', '/group/update', { groupId: chatJid, participants: [participant], action: 'remove' });
+    // A AvisaAPI às vezes responde 200 com o erro dentro (ex.: { data: { code: 500 } }).
+    const code = Number(r?.data?.code ?? r?.code ?? 200);
+    if (r?.status === false || r?.success === false || r?.data?.success === false || code >= 400) {
+      throw new Error(`AvisaAPI não removeu: ${JSON.stringify(r).slice(0, 300)}`);
+    }
+  }
+
   /** A AvisaAPI devolve todos os grupos do número; pode levar ~30 s. */
   async listGroupMembers(chatJid: string): Promise<GroupMember[]> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
