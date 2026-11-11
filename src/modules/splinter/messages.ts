@@ -140,6 +140,7 @@ export function helpText(): string {
     '• #mascote - mostra quem é o mascote. Para falar com ele, comece a mensagem pelo nome dele',
     '• #comparecer nome do evento - confirma sua presença',
     '• #desistir nome do evento - tira seu nome da lista',
+    '• #insta @usuario - coloca seu Instagram na lista do grupo (#removeinsta tira, #listainsta mostra todos)',
     '',
     '🏋️ *Durante o desafio*',
     '• #regras, #ranking e #equipes',
