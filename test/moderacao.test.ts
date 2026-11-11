@@ -155,3 +155,29 @@ describe('#promover e #demover', () => {
     expect(w.wa.last()).toContain('agora é admin');
   });
 });
+
+describe('#ban', () => {
+  it('só admin, exige citar a mensagem, protege admins e remove (ou pede aos admins)', async () => {
+    w = await world();
+    const quoted = (phone: string) => ({ id: 'X1', participant: `${phone}@s.whatsapp.net` });
+    await w.send({ phone: ANA, name: 'Ana', at: '2026-11-09T15:00:00Z', text: '#ban', quoted: quoted(BRUNO) });
+    expect(w.wa.last()).toContain('Só os admins podem remover');
+    await w.send({ phone: ADMIN, name: 'Felipe', at: '2026-11-09T15:01:00Z', text: '#ban' });
+    expect(w.wa.last()).toContain('respondendo');
+    await w.send({ phone: ADMIN, name: 'Felipe', at: '2026-11-09T15:02:00Z', text: '#ban', quoted: quoted(ADMIN) });
+    expect(w.wa.last()).toContain('admin do bot');
+
+    // sem como remover pela API: pede aos admins
+    await w.send({ phone: BRUNO, name: 'Bruno', at: '2026-11-09T15:03:00Z', text: 'oi' });
+    await w.send({ phone: ADMIN, name: 'Felipe', at: '2026-11-09T15:04:00Z', text: '#ban', quoted: quoted(BRUNO) });
+    expect(w.wa.last()).toContain('Não consegui remover *Bruno*');
+
+    const removed: string[] = [];
+    w.wa.removeParticipant = async (_chat: string, jid: string) => {
+      removed.push(jid);
+    };
+    await w.send({ phone: ADMIN, name: 'Felipe', at: '2026-11-09T15:05:00Z', text: '#BAN', quoted: quoted(BRUNO) });
+    expect(removed).toEqual([`${BRUNO}@s.whatsapp.net`]);
+    expect(w.wa.last()).toContain('*Bruno* foi removido(a) do grupo');
+  });
+});
