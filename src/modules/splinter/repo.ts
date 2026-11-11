@@ -30,6 +30,15 @@ export class SplinterRepo {
       where challenge_id = ${challengeId} order by id`;
   }
 
+  async setRuleActive(ruleId: number, active: boolean): Promise<void> {
+    await this.sql`update splinter_rules set active = ${active} where id = ${ruleId}`;
+  }
+
+  /** Liga ou desliga uma das funções do desafio que ficam na própria tabela do desafio. */
+  async setChallengeFlag(challengeId: string, flag: 'daily_summary' | 'persona_messages' | 'require_location', on: boolean): Promise<void> {
+    await this.sql`update splinter_challenges set ${this.sql({ [flag]: on })} where id = ${challengeId}`;
+  }
+
   async participantByPhone(challengeId: string, phone: string): Promise<Participant | null> {
     if (digits(phone).length < 8) return null;
     const rows = await this.sql<Participant[]>`
