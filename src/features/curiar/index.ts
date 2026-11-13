@@ -1,7 +1,7 @@
 import type { BotContext, BotModule } from '../../core/types.js';
 import { local } from '../../core/time.js';
 import { adminOnly } from '../admins/index.js';
-import { digits, samePhone } from '../../core/phone.js';
+import { mentionableMembers } from '../../core/members.js';
 
 /** Liga e desliga uma opção em bots.settings. */
 export async function setSetting(ctx: BotContext, patch: Record<string, unknown>): Promise<void> {
@@ -45,13 +45,9 @@ export async function curiarJob(ctx: BotContext): Promise<void> {
 export async function sendToAll(ctx: BotContext, text: string): Promise<void> {
   if (typeof ctx.wa.sendTextMentions === 'function') {
     try {
-      const members = await ctx.wa.listGroupMembers(ctx.bot.chatJid);
-      const [conn] = await ctx.sql<{ own_phone: string | null }[]>`select own_phone from wa_connections where id = ${ctx.bot.connectionId}`;
-      const jids = members
-        .filter((m) => !(conn?.own_phone && samePhone(conn.own_phone, m.phone)))
-        .map((m) => (digits(m.phone).length >= 8 ? `${digits(m.phone)}@s.whatsapp.net` : m.jid))
-        .filter(Boolean);
+      const jids = (await mentionableMembers(ctx, '#curiar')).map((m) => m.jid);
       if (jids.length) return await ctx.wa.sendTextMentions(ctx.bot.chatJid, text, jids);
+      ctx.log.warn('#curiar: ninguém para marcar; mandando sem marcar');
     } catch (err) {
       ctx.log.warn({ err: String(err) }, 'não consegui marcar todos no #curiar; mandando sem marcar');
     }

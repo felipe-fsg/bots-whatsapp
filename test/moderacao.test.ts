@@ -159,6 +159,41 @@ describe('#curiar', () => {
   });
 });
 
+describe('#curiar com LID', () => {
+  it('troca o LID pelo telefone conhecido e, se a lista vier vazia, marca quem já falou no grupo', async () => {
+    w = await world();
+    // grupo novo: a AvisaAPI manda só o LID, e o "telefone" vira os dígitos do LID
+    w.wa.members = [
+      { jid: '111111111111111@lid', lid: '111111111111111@lid', phone: '111111111111111' },
+      { jid: '222222222222222@lid', lid: '222222222222222@lid', phone: '222222222222222' },
+      { jid: '333333333333333@lid', lid: '333333333333333@lid', phone: '333333333333333' },
+    ];
+    await w.sql`insert into wa_contacts (connection_id, lid, phone)
+      select id, '111111111111111@lid', ${ANA} from wa_connections union all
+      select id, '222222222222222@lid', ${BRUNO} from wa_connections`;
+    const mentioned: string[][] = [];
+    Object.assign(w.wa, {
+      sendTextMentions: async (chat: string, text: string, jids: string[]) => {
+        mentioned.push(jids);
+        w!.wa.sent.push({ chat, text });
+      },
+    });
+    w.runtime.invalidate();
+    await w.send({ phone: ADMIN, at: '2026-11-09T12:01:00Z', text: '#curiar' });
+    w.now.value = at(9, 15);
+    await curiarJob(await ctxOf(w));
+    // o terceiro LID não tem telefone conhecido: completa com quem já falou no grupo (o admin)
+    expect(mentioned.at(-1)).toEqual([`${ANA}@s.whatsapp.net`, `${BRUNO}@s.whatsapp.net`, `${ADMIN}@s.whatsapp.net`]);
+    expect(mentioned.at(-1)!.some((j) => j.startsWith('333'))).toBe(false);
+
+    // lista vazia: usa quem já falou no grupo
+    w.wa.members = [];
+    await w.send({ phone: CAIO, name: 'Caio', at: '2026-11-09T15:30:00Z', text: 'oi' });
+    await curiarJob(await ctxOf(w));
+    expect(mentioned.at(-1)).toEqual(expect.arrayContaining([`${ADMIN}@s.whatsapp.net`, `${CAIO}@s.whatsapp.net`]));
+  });
+});
+
 describe('#promover e #demover', () => {
   it('admin promove e demove pelo @, sem ficar sem admin', async () => {
     w = await world();
