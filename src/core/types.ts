@@ -30,7 +30,11 @@ export interface InboundMessage {
     text: string;
     /** Quando a mensagem citada é uma localização. */
     location?: { lat: number; lng: number };
+    /** Quando a mensagem citada é uma foto. */
+    image?: { sha256: string };
   };
+  /** Legenda de foto editada: ID da mensagem original. */
+  editOf?: string;
   /** JIDs marcados com @ (podem ser @lid). */
   mentions: string[];
   /** Quem entrou no grupo (JIDs, podem ser @lid), quando type = 'join'. */

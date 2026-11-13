@@ -123,3 +123,21 @@ function clean(s: string, max: number): string {
 }
 
 export const POSE_TAG = '#posedodia';
+
+const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
+
+/**
+ * Hashtag escrita com variação ('#treinos', '#treinei', '#treinando', '#Hidratação').
+ * Só usa quando nenhuma hashtag bate exatamente e uma única categoria bate pela raiz.
+ * Raiz = hashtag sem a última vogal, para hashtags com 5 letras ou mais (#pose só aceita #poses).
+ */
+export function findRuleLoose(text: string, rules: Rule[]): Rule | undefined {
+  const tags = hashtags(text).map(fold);
+  const matches = (r: Rule) => {
+    const h = fold(r.hashtag);
+    const stem = h.length >= 6 ? h.replace(/[aeiou]$/, '') : null;
+    return tags.some((t) => t === h || t === `${h}s` || (stem !== null && t.startsWith(stem)));
+  };
+  const found = rules.filter(matches);
+  return found.length === 1 ? found[0] : undefined;
+}
