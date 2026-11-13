@@ -35,6 +35,22 @@ export class AvisaClient implements WhatsAppProvider {
     return String(r?.data?.response?.data?.Id ?? r?.response?.data?.Id ?? r?.data?.Id ?? r?.id ?? r?.messageId ?? '');
   }
 
+  /**
+   * Manda texto marcando pessoas. Os números vão na lista de menções da mensagem (contextInfo.mentionedJid),
+   * então todos recebem a notificação de "marcado" mesmo sem o @ aparecer no texto.
+   */
+  async sendTextMentions(chatJid: string, text: string, jids: string[]): Promise<void> {
+    const list = [...new Set(jids.map((j) => (j.includes('@') ? j.replace(/:\d+(?=@)/, '') : `${digits(j)}@s.whatsapp.net`)))];
+    await this.call('POST', '/actions/sendMessage', {
+      number: chatJid,
+      message: text,
+      // A AvisaAPI não publica o nome do campo; mandamos nos formatos usados por APIs baseadas no whatsmeow.
+      mentions: list,
+      mentionedJid: list,
+      ContextInfo: { MentionedJID: list },
+    });
+  }
+
   /** Tira alguém do grupo (POST /group/update, action remove). O número do bot precisa ser admin do grupo. */
   async removeParticipant(chatJid: string, jid: string): Promise<void> {
     const participant = jid.includes('@') ? jid.replace(/:\d+(?=@)/, '') : `${digits(jid)}@s.whatsapp.net`;

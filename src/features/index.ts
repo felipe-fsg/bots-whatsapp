@@ -9,6 +9,7 @@ import { curiar } from './curiar/index.js';
 import { admins } from './admins/index.js';
 import { instagram } from './instagram/index.js';
 import { pista } from './pista/index.js';
+import { suporte } from './suporte/index.js';
 
 /** Funções do núcleo. Um módulo pode limitar quais usa (o técnico, grupo profissional, só usa agenda, resumo e pesquisa). */
-export const features: BotModule[] = [inativos, boasvindas, agenda, resumo, pesquisa, curiar, admins, instagram, pista, mascote];
+export const features: BotModule[] = [suporte, inativos, boasvindas, agenda, resumo, pesquisa, curiar, admins, instagram, pista, mascote];

@@ -54,6 +54,16 @@ ENV
   chmod 600 .env
 fi
 
+if ! grep -q '^GITHUB_ISSUES_TOKEN=' .env; then
+  echo
+  echo "#suporte: os pedidos dos admins viram issues no GitHub (etiqueta \"suporte\")."
+  echo "Cole um token fine-grained só deste repositório com Issues: Read and write. Enter para pular."
+  read -rsp "Token do GitHub para o #suporte: " GH_ISSUES; echo
+  if [ -n "$GH_ISSUES" ]; then
+    printf 'GITHUB_ISSUES_TOKEN=%s\nGITHUB_ISSUES_REPO=felipe-fsg/bots-whatsapp\n' "$GH_ISSUES" >> .env
+  fi
+fi
+
 echo "==> Subindo os serviços (a primeira vez leva alguns minutos)"
 docker compose up -d --build
 

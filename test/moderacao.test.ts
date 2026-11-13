@@ -128,6 +128,35 @@ describe('#curiar', () => {
     expect(w.wa.sent).toHaveLength(n);
     expect([periodOf(10), periodOf(15), periodOf(21)]).toEqual(['manha', 'tarde', 'noite']);
   });
+
+  it('marca todo mundo do grupo, menos o próprio bot', async () => {
+    w = await world();
+    w.wa.members = [
+      { jid: `${ANA}@s.whatsapp.net`, phone: ANA },
+      { jid: '123456789@lid', phone: BRUNO },
+      { jid: `${BOT}@s.whatsapp.net`, phone: BOT },
+    ];
+    await w.sql`update wa_connections set own_phone = ${BOT}`;
+    const mentioned: string[][] = [];
+    Object.assign(w.wa, {
+      sendTextMentions: async (chat: string, text: string, jids: string[]) => {
+        mentioned.push(jids);
+        w!.wa.sent.push({ chat, text });
+      },
+    });
+    w.runtime.invalidate();
+    await w.send({ phone: ADMIN, at: '2026-11-09T12:01:00Z', text: '#curiar' });
+    w.now.value = at(9, 15);
+    w.ai.textAnswer = '📸 Boa tarde! Foto agora!';
+    await curiarJob(await ctxOf(w));
+    expect(w.wa.last()).toBe('📸 Boa tarde! Foto agora!');
+    expect(mentioned).toEqual([[`${ANA}@s.whatsapp.net`, `${BRUNO}@s.whatsapp.net`]]);
+
+    // se marcar falhar, manda sem marcar
+    Object.assign(w.wa, { sendTextMentions: async () => { throw new Error('boom'); } });
+    await curiarJob(await ctxOf(w));
+    expect(w.wa.last()).toBe('📸 Boa tarde! Foto agora!');
+  });
 });
 
 describe('#promover e #demover', () => {
