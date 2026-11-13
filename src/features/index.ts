@@ -12,7 +12,8 @@ import { pista } from './pista/index.js';
 import { suporte } from './suporte/index.js';
 import { engajamento } from './engajamento/index.js';
 import { grupo } from './grupo/index.js';
+import { quem } from './quem/index.js';
 
 /** Funções do núcleo. Um módulo pode limitar quais usa (o técnico, grupo profissional, só usa agenda, resumo e pesquisa). */
 // engajamento vem primeiro para contar toda mensagem, inclusive comandos.
-export const features: BotModule[] = [engajamento, suporte, grupo, inativos, boasvindas, agenda, resumo, pesquisa, curiar, admins, instagram, pista, mascote];
+export const features: BotModule[] = [engajamento, suporte, grupo, inativos, boasvindas, agenda, resumo, pesquisa, curiar, admins, instagram, pista, quem, mascote];
