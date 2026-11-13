@@ -79,7 +79,7 @@ describe('limites', () => {
   it('avisa quem não está inscrito e quem manda depois do horário', async () => {
     w = await world({ challenge: { checkin_deadline: '22:00' } });
     await w.send({ phone: '5511933333333', name: 'Zé', at: '2026-11-09T10:00:00Z', image: { sha: 'z', caption: '#agua' } });
-    expect(w.wa.last()).toContain('não encontrei seu número');
+    expect(w.wa.last()).toContain('ainda não está inscrito');
     await w.send({ phone: ANA, name: 'Ana', at: '2026-11-10T01:30:00Z', image: { sha: 'z2', caption: '#agua' } }); // 22:30 em SP
     expect(w.wa.last()).toContain('depois de 22:00');
   });
