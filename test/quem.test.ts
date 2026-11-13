@@ -48,11 +48,11 @@ describe('#quem', () => {
     await w.send({ phone: ANA, name: 'Ana', at: '2026-11-09T12:04:00Z', text: '#quem paga a pizza?' });
     expect(w.wa.last()).toBe(`🎲 @${BRUNO} (*Bruno*) paga a pizza.`);
 
-    // com LID: marca pelo LID, que o celular mostra como nome
+    // mesmo sabendo o LID, marca pelo telefone (é o que a AvisaAPI aceita)
     w.wa.members[1] = { jid: `${BRUNO}@s.whatsapp.net`, lid: '99887766@lid', phone: BRUNO };
     await w.send({ phone: ANA, name: 'Ana', at: '2026-11-09T12:05:00Z', text: '#quem paga a pizza?' });
-    expect(w.wa.last()).toBe('🎲 @99887766 paga a pizza.');
-    expect(mentioned.at(-1)).toEqual(['99887766@lid']);
+    expect(w.wa.last()).toBe(`🎲 @${BRUNO} (*Bruno*) paga a pizza.`);
+    expect(mentioned.at(-1)).toEqual([`${BRUNO}@s.whatsapp.net`]);
   });
 
   it('sem menções no provedor, manda o nome em negrito', async () => {
