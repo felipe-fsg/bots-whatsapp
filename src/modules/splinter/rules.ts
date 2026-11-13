@@ -1,20 +1,21 @@
+import { foldCommand } from '../../core/commands.js';
 import type { Challenge, CheckinStatus, Rule } from './types.js';
 
-/** Hashtags da legenda, em minúsculas ('Treino hoje #Treino #foco' -> ['#treino', '#foco']). */
+/** Hashtags da legenda, em minúsculas e sem acento ('Treino hoje #Treino #Hidratação' -> ['#treino', '#hidratacao']). */
 export function hashtags(text: string): string[] {
-  return (text.toLowerCase().match(/#[\p{L}\p{N}_]+/gu) ?? []).map((h) => h.normalize('NFC'));
+  return (text.normalize('NFC').match(/#[\p{L}\p{M}\p{N}_]+/gu) ?? []).map(foldCommand);
 }
 
 /** Primeira regra ativa cuja hashtag aparece na legenda. */
 export function findRule(text: string, rules: Rule[]): Rule | undefined {
   const tags = new Set(hashtags(text));
-  return rules.find((r) => r.active && tags.has(r.hashtag.toLowerCase().trim()));
+  return rules.find((r) => r.active && tags.has(foldCommand(r.hashtag.trim())));
 }
 
 /** Regra desativada pelos admins cuja hashtag aparece na legenda (para avisar que não vale ponto). */
 export function findDisabledRule(text: string, rules: Rule[]): Rule | undefined {
   const tags = new Set(hashtags(text));
-  return rules.find((r) => !r.active && tags.has(r.hashtag.toLowerCase().trim()));
+  return rules.find((r) => !r.active && tags.has(foldCommand(r.hashtag.trim())));
 }
 
 /** A foto vale para o dia em que foi mandada, até o horário limite, dentro das datas do desafio. */

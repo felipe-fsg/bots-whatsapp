@@ -3,6 +3,7 @@ import type { AiClient, Bot, BotContext, BotModule, InboundMessage, Logger, Plac
 import { Contacts } from './contacts.js';
 import { KeyedQueue } from './queue.js';
 import { digits, last8, samePhone } from './phone.js';
+import { normalizeCommand } from './commands.js';
 import { AvisaClient } from './whatsapp/avisa.js';
 
 interface ConnectionRow {
@@ -160,7 +161,7 @@ export class Runtime {
         return 'forwarded';
       }
       // Para cadastrar um grupo novo: alguém manda #codigogrupo nele e o código aparece no log.
-      if (msg.isGroup && /^#c[oó]digo ?grupo\b/i.test(msg.text.trim())) {
+      if (msg.isGroup && /^#codigo ?grupo\b/.test(normalizeCommand(msg.text.trim()))) {
         this.deps.log.info({ chat: msg.chatJid, conexao: conn.id }, 'código do grupo');
       }
       return 'ignored';
@@ -192,6 +193,7 @@ export class Runtime {
             on conflict (connection_id, phone) do update set push_name = excluded.push_name, updated_at = now()`;
         }
         await this.logMessage(bot.id, msg);
+        msg.text = normalizeCommand(msg.text);
         const ctx = this.context(bot);
         for (const feature of this.deps.features ?? []) {
           if (module.features && !module.features.includes(feature.id)) continue;
