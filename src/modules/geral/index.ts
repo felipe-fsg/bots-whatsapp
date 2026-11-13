@@ -17,6 +17,7 @@ export function helpText(mascot: string): string {
     '• ?pesquisa + o que procurar - pesquisa na internet. Ex.: ?pesquisa restaurantes de sushi na Liberdade',
     '• #insta @usuario - coloca seu Instagram na lista do grupo (#removeinsta tira, #listainsta mostra todos)',
     '• #estadocivil + sua situação - entra na lista da #pista, que mostra o estado civil da galera',
+    '• #engajamento - ranking de quem mais manda mensagens no grupo',
     `• Para conversar com o mascote, comece a mensagem com "${mascot.split(' ').pop()}"`,
     '',
     '🛡️ *Admins*',
