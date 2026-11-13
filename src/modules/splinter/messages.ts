@@ -127,6 +127,10 @@ export function rulesText(ch: Challenge, rules: Rule[]): string {
 export const activityOff = (name: string, category: string) =>
   `⛔ ${name || 'Jovem guerreiro'}, a atividade *${category}* está desativada pelos admins neste momento. Esta foto não vale ponto.`;
 
+export const paused = (name: string) =>
+  `⏸️ ${name || 'Jovem guerreiro'}, a competição está pausada pelos admins. Essa foto não vale ponto. Assim que voltar, eu aviso aqui.`;
+export const PAUSED_NOTE = '\n\n⏸️ Competição pausada: as fotos não estão valendo ponto agora.';
+
 export const onlyAdmin = (what: string) => `🛡️ Só os admins podem ${what}.`;
 
 /** #ajuda: comandos que valem a qualquer momento, com ou sem desafio. */
@@ -161,5 +165,7 @@ export function helpText(): string {
     '• #ativarBAN / #desativarBAN - aviso semanal de quem está sumido há 7 dias (sai do grupo depois do 3º aviso)',
     '• #curiar / #nãocuriar - liga ou desliga o pedido de fotos às 10h, 15h e 21h',
     '• #ativar / #desativar + atividade - liga ou desliga uma atividade do desafio. Ex.: #desativar pose, #ativar cardio, #desativar resumo',
+    '• #pausar / #despausar - pausa a competição (fotos não valem ponto) e retoma',
+    '• #reiniciar - zera a pontuação da competição (o bot pergunta 3 vezes antes)',
   ].join('\n');
 }
