@@ -145,6 +145,7 @@ export function helpText(): string {
     '• #desistir nome do evento - tira seu nome da lista',
     '• #insta @usuario - coloca seu Instagram na lista do grupo (#removeinsta tira, #listainsta mostra todos)',
     '• #estadocivil + sua situação - entra na lista da #pista, que mostra o estado civil da galera',
+    '• #engajamento - ranking de quem mais manda mensagens no grupo',
     '',
     '🏋️ *Durante o desafio*',
     '• #regras, #ranking e #equipes',
