@@ -46,8 +46,18 @@ export function prettyPhone(phone: string): string {
   return m ? `+55 ${m[1]} ${m[2]}-${m[3]}` : d ? `+${d}` : '';
 }
 
+/**
+ * Onde vai o nome de quem entrou: {nome}, {nome da pessoa}, {pessoa}, [nome], {membro}...
+ * Qualquer coisa entre chaves ou colchetes que fale de nome/pessoa/membro/fulano.
+ */
+const PLACEHOLDER = /[{[]\s*[^{}[\]\n]{0,30}?\b(?:nome|pessoa|membro|fulan[oa]|novat[oa]|participante)\b[^{}[\]\n]{0,30}?\s*[}\]]/giu;
+
+export function hasPlaceholder(template: string): boolean {
+  return new RegExp(PLACEHOLDER.source, PLACEHOLDER.flags).test(template);
+}
+
 export function welcomeText(template: string, name: string): string {
-  return template.includes('{nome}') ? template.replaceAll('{nome}', name) : `${name}\n\n${template}`;
+  return hasPlaceholder(template) ? template.replace(new RegExp(PLACEHOLDER.source, PLACEHOLDER.flags), () => name) : `${name}\n\n${template}`;
 }
 
 /** Telefone (ou LID) de um membro, usado como chave em group_members. */
@@ -69,8 +79,18 @@ async function claim(ctx: BotContext, key: string): Promise<boolean> {
 
 async function welcome(ctx: BotContext, cfg: WelcomeSettings, phone: string): Promise<void> {
   // Quem volta para o grupo pode já ter nome conhecido; senão, mostramos o telefone.
-  const name = (phone && (await ctx.nameOf(phone))) || prettyPhone(phone) || 'pessoa nova';
-  await ctx.reply(welcomeText(cfg.text, name));
+  const known = (phone && (await ctx.nameOf(phone))) || '';
+  if (phone && typeof ctx.wa.sendTextMentions === 'function') {
+    try {
+      // Igual ao #quem: a AvisaAPI só marca de verdade pelo telefone (pelo LID não pega). Quem não tem o
+      // contato salvo vê só o número verde, então o nome vai junto quando o bot já conhece a pessoa.
+      const tag = `@${phone}${known ? ` (*${known}*)` : ''}`;
+      return await ctx.wa.sendTextMentions(ctx.bot.chatJid, welcomeText(cfg.text, tag), [`${phone}@s.whatsapp.net`]);
+    } catch (err) {
+      ctx.log.warn({ err: String(err) }, 'não consegui marcar nas boas-vindas; mandando sem marcar');
+    }
+  }
+  await ctx.reply(welcomeText(cfg.text, known || prettyPhone(phone) || 'pessoa nova'));
 }
 
 async function greet(ctx: BotContext, msg: InboundMessage): Promise<void> {
@@ -130,7 +150,7 @@ async function command(ctx: BotContext, msg: InboundMessage, arg: string): Promi
         '',
         welcomeText(cfg.text, '(nome da pessoa)'),
         '',
-        '🛡️ Para trocar: #boasvindas e o texto novo (use {nome} onde vai o nome). #boasvindas padrão volta ao original. #boasvindas desligar / ligar.',
+        '🛡️ Para trocar: #boasvindas e o texto novo (use {nome} onde vai a marcação da pessoa). #boasvindas padrão volta ao original. #boasvindas desligar / ligar.',
       ].join('\n'),
     );
     return;
