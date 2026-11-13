@@ -63,11 +63,63 @@ export class AvisaClient implements WhatsAppProvider {
     }
   }
 
-  /** A AvisaAPI devolve todos os grupos do número; pode levar ~30 s. */
-  async listGroupMembers(chatJid: string): Promise<GroupMember[]> {
+  /**
+   * Liga ou desliga o "só admins mandam mensagens" (announce do WhatsApp). O número do bot precisa ser admin.
+   * A AvisaAPI não publica a rota disso; tentamos as usadas por APIs baseadas no whatsmeow e conferimos
+   * na lista de grupos (campo IsAnnounce) se mudou mesmo. A primeira que funcionar fica guardada.
+   */
+  async setAdminsOnly(chatJid: string, on: boolean): Promise<void> {
+    const attempts: { path: string; body: unknown }[] = [
+      { path: '/group/announce', body: { groupId: chatJid, announce: on, GroupJID: chatJid, Announce: on } },
+      { path: '/group/update', body: { groupId: chatJid, action: on ? 'announcement' : 'not_announcement' } },
+      { path: '/group/settings', body: { groupId: chatJid, announce: on, setting: on ? 'announcement' : 'not_announcement' } },
+    ];
+    const all = attempts.map((_, i) => i);
+    const route = this.announceRoute;
+    const order = route === undefined ? all : [route, ...all.filter((i) => i !== route)];
+    const errors: string[] = [];
+    for (const i of order) {
+      const a = attempts[i]!;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const r: any = await this.call('POST', a.path, a.body);
+        const code = Number(r?.data?.code ?? r?.code ?? 200);
+        if (r?.status === false || r?.success === false || r?.data?.success === false || code >= 400) {
+          throw new Error(JSON.stringify(r).slice(0, 200));
+        }
+        const now = await this.isAdminsOnly(chatJid).catch(() => undefined);
+        if (now === undefined || now === on) {
+          this.announceRoute = i;
+          return;
+        }
+        errors.push(`${a.path}: respondeu OK mas o grupo não mudou`);
+      } catch (err) {
+        errors.push(`${a.path}: ${String(err).slice(0, 200)}`);
+      }
+    }
+    throw new Error(`AvisaAPI não mudou o grupo: ${errors.join(' | ')}`);
+  }
+
+  private announceRoute?: number;
+
+  /** true se só admins mandam mensagens; undefined se a AvisaAPI não informar. */
+  private async isAdminsOnly(chatJid: string): Promise<boolean | undefined> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const group: any = (await this.groups()).find((g) => g.JID === chatJid);
+    const v = group?.IsAnnounce ?? group?.GroupAnnounce?.IsAnnounce ?? group?.announce;
+    return typeof v === 'boolean' ? v : undefined;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async groups(): Promise<any[]> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res: any = await this.call('GET', '/group/list');
-    const groups: any[] = res?.data?.data?.Groups ?? res?.data?.Groups ?? res?.Groups ?? [];
+    return res?.data?.data?.Groups ?? res?.data?.Groups ?? res?.Groups ?? [];
+  }
+
+  /** A AvisaAPI devolve todos os grupos do número; pode levar ~30 s. */
+  async listGroupMembers(chatJid: string): Promise<GroupMember[]> {
+    const groups = await this.groups();
     const group = groups.find((g) => g.JID === chatJid);
     return (group?.Participants ?? []).map((p: any) => ({
       jid: String(p.JID ?? ''),
