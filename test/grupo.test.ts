@@ -26,6 +26,9 @@ describe('#fechargrupo / #abrirgrupo', () => {
     expect(w.wa.last()).toContain('🔒 Grupo fechado');
     await w.send({ phone: ADMIN, at: '2026-11-09T12:03:00Z', text: '#abrirgrupo' });
     expect(w.wa.last()).toContain('🔓 Grupo aberto');
+    Object.assign(w.wa, { setAdminsOnly: async () => 'unverified' });
+    await w.send({ phone: ADMIN, at: '2026-11-09T12:04:00Z', text: '#fechargrupo' });
+    expect(w.wa.last()).toContain('não consegui conferir');
     expect(calls).toEqual([
       [GROUP, true],
       [GROUP, false],
