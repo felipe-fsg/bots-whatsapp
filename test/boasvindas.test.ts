@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { parseWhatsmeowEvent } from '../src/core/whatsapp/whatsmeow.js';
-import { DEFAULT_WELCOME, checkMembers, prettyPhone } from '../src/features/boasvindas/index.js';
+import { DEFAULT_WELCOME, checkMembers, prettyPhone, welcomeText } from '../src/features/boasvindas/index.js';
 import { GROUP, world, type World } from './helpers.js';
 
 describe('boas-vindas', () => {
@@ -27,6 +27,31 @@ describe('boas-vindas', () => {
     await w.sql`insert into wa_people (connection_id, phone, push_name) values (${w.connectionId}, '5511977778888', 'Carla')`;
     await join([{ User: '5511977778888', Server: 's.whatsapp.net' }]);
     expect(w.wa.last()).toContain('\n\nCarla\n\n');
+  });
+
+  it('aceita {nome da pessoa} e outras formas de marcar onde vai o nome', () => {
+    expect(welcomeText('Oiii, {nome da pessoa} ! Seja bem-vinde', '@55 (*Ana*)')).toBe('Oiii, @55 (*Ana*) ! Seja bem-vinde');
+    expect(welcomeText('Oi {Nome}, {PESSOA} e [nome]', 'X')).toBe('Oi X, X e X');
+    expect(welcomeText('Oi { nome do membro }!', 'X')).toBe('Oi X!');
+    expect(welcomeText('Instagram: {insta}', 'X')).toBe('X\n\nInstagram: {insta}');
+  });
+
+  it('marca quem entrou pelo telefone, com o nome entre parênteses quando conhecido', async () => {
+    const mentioned: string[][] = [];
+    Object.assign(w.wa, {
+      sendTextMentions: async (chat: string, text: string, jids: string[]) => {
+        mentioned.push(jids);
+        w.wa.sent.push({ chat, text });
+      },
+    });
+    await w.send({ phone: '5511900000001', at: '2026-11-09T12:00:00Z', text: '#boasvindas Oiii, {nome da pessoa} ! Seja bem-vinde' });
+    await join(['5511955556666@s.whatsapp.net']);
+    expect(w.wa.last()).toBe('Oiii, @5511955556666 ! Seja bem-vinde');
+    expect(mentioned.at(-1)).toEqual(['5511955556666@s.whatsapp.net']);
+
+    await w.sql`insert into wa_people (connection_id, phone, push_name) values (${w.connectionId}, '5511977778888', 'Carla')`;
+    await join(['5511977778888@s.whatsapp.net']);
+    expect(w.wa.last()).toBe('Oiii, @5511977778888 (*Carla*) ! Seja bem-vinde');
   });
 
   it('admin troca, desliga e volta ao padrão', async () => {
