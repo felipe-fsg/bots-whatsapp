@@ -25,6 +25,7 @@ import { displayName, type Challenge, type Participant, type Rule } from './type
 import { splinterJobs } from './jobs.js';
 import { activitiesText, toggleActivities } from './atividades.js';
 import { rememberPhoto, rememberTag, takePhoto, takeTag } from './pendentes.js';
+import { answerReset, askReset, togglePause } from './controle.js';
 
 export const splinter: BotModule = {
   id: 'splinter',
@@ -93,6 +94,7 @@ async function checkinPhoto(ctx: BotContext, repo: SplinterRepo, ch: Challenge, 
   const participant = await repo.participantByPhone(ch.id, msg.senderPhone);
   if (!participant?.active) return ctx.reply(M.notEnrolled(msg.pushName));
   if (!rule) return ctx.reply(M.activityOff(msg.pushName, off!.category));
+  if (ch.paused) return ctx.reply(M.paused(msg.pushName));
   const day = localDay(msg.timestamp, ch.timezone);
   if (!inPeriod(day, localTime(msg.timestamp, ch.timezone), ch)) return ctx.reply(M.outOfPeriod(msg.pushName, ch.checkin_deadline));
 
@@ -268,7 +270,7 @@ async function runCommand(ctx: BotContext, repo: SplinterRepo, ch: Challenge, ms
   }
   switch (cmd.type) {
     case 'ranking':
-      return ctx.reply(M.rankingText(ch.name, await repo.ranking(ch.id)));
+      return ctx.reply(M.rankingText(ch.name, await repo.ranking(ch.id)) + (ch.paused ? M.PAUSED_NOTE : ''));
     case 'equipes':
       return ctx.reply(M.teamRankingText(ch.name, await repo.teamRanking(ch.id, ch.team_bonus_points)));
     case 'regras':
@@ -279,6 +281,12 @@ async function runCommand(ctx: BotContext, repo: SplinterRepo, ch: Challenge, ms
       return ctx.reply(activitiesText(ch, await repo.rules(ch.id)));
     case 'ativar':
       return toggleActivities(ctx, repo, ch, msg, cmd.on, cmd.names);
+    case 'pausar':
+      return togglePause(ctx, repo, ch, msg, cmd.on);
+    case 'reiniciar':
+      return askReset(ctx, repo, ch, msg);
+    case 'confirmar':
+      return answerReset(ctx, repo, ch, msg, cmd.yes);
   }
 
   // daqui para baixo, só admins

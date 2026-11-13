@@ -32,11 +32,30 @@ function jidOf(m: GroupMember): string {
   return digits(m.phone).length >= 8 ? `${digits(m.phone)}@s.whatsapp.net` : m.jid;
 }
 
+/** Lista do grupo na AvisaAPI (tenta 2 vezes). Se não vier, usa quem o bot já viu no grupo. */
+async function groupMembers(ctx: BotContext): Promise<GroupMember[]> {
+  for (let i = 0; i < 2; i++) {
+    try {
+      const list = await ctx.wa.listGroupMembers(ctx.bot.chatJid);
+      if (list.length) return list;
+      ctx.log.warn({ chat: ctx.bot.chatJid }, '#quem: a AvisaAPI devolveu o grupo sem membros');
+    } catch (err) {
+      ctx.log.warn({ err: String(err) }, '#quem: não consegui listar o grupo');
+    }
+  }
+  const rows = await ctx.sql<{ phone: string }[]>`
+    select phone from member_message_counts where bot_id = ${ctx.bot.id}
+    union
+    select phone from member_activity where bot_id = ${ctx.bot.id}`;
+  const seen = new Set<string>();
+  return rows
+    .map((r) => digits(r.phone))
+    .filter((p) => p.length >= 8 && !seen.has(p.slice(-8)) && seen.add(p.slice(-8)))
+    .map((p) => ({ jid: `${p}@s.whatsapp.net`, phone: p }));
+}
+
 async function draw(ctx: BotContext, msg: InboundMessage, question: string): Promise<void> {
-  const members = await ctx.wa.listGroupMembers(ctx.bot.chatJid).catch((err) => {
-    ctx.log.warn({ err: String(err) }, 'não consegui listar o grupo no #quem');
-    return [] as GroupMember[];
-  });
+  const members = await groupMembers(ctx);
   const [conn] = await ctx.sql<{ own_phone: string | null }[]>`select own_phone from wa_connections where id = ${ctx.bot.connectionId}`;
   const all = members.filter((m) => jidOf(m) && !(conn?.own_phone && samePhone(conn.own_phone, m.phone)));
   // Quem perguntou não é sorteado (a não ser que esteja sozinho com o bot).
@@ -58,16 +77,31 @@ async function draw(ctx: BotContext, msg: InboundMessage, question: string): Pro
   }
   if (!sentence.includes(SLOT)) sentence = quemFallback(question, asker);
 
-  const jid = jidOf(chosen);
+  const name = (await ctx.nameOf(chosen.phone)) || '';
   if (typeof ctx.wa.sendTextMentions === 'function') {
     try {
-      return await ctx.wa.sendTextMentions(ctx.bot.chatJid, `🎲 ${sentence.replace(SLOT, `@${jid.split('@')[0]}`)}`, [jid]);
+      // Nos grupos novos o WhatsApp identifica as pessoas pelo LID; marcando pelo LID o celular mostra o nome.
+      // Pelo telefone, o celular de quem não salvou o contato mostra só o número, então o nome vai junto.
+      const lid = await lidOf(ctx, chosen);
+      const jid = lid || jidOf(chosen);
+      const tag = `@${jid.split('@')[0]}${lid || !name ? '' : ` (*${name}*)`}`;
+      return await ctx.wa.sendTextMentions(ctx.bot.chatJid, `🎲 ${sentence.replace(SLOT, tag)}`, [jid]);
     } catch (err) {
       ctx.log.warn({ err: String(err) }, 'não consegui marcar no #quem; mandando sem marcar');
     }
   }
-  const name = (await ctx.nameOf(chosen.phone)) || prettyPhone(chosen.phone);
-  await ctx.reply(`🎲 ${sentence.replace(SLOT, `*${name}*`)}`);
+  await ctx.reply(`🎲 ${sentence.replace(SLOT, `*${name || prettyPhone(chosen.phone)}*`)}`);
+}
+
+/** LID da pessoa (ex.: 123456789@lid), da lista do grupo ou do que o bot já aprendeu. Vazio se não souber. */
+async function lidOf(ctx: BotContext, m: GroupMember): Promise<string> {
+  for (const j of [m.lid, m.jid]) if (j?.endsWith('@lid')) return j.replace(/:\d+(?=@)/, '');
+  const phone = digits(m.phone);
+  if (phone.length < 8) return '';
+  const [row] = await ctx.sql<{ lid: string }[]>`
+    select lid from wa_contacts where connection_id = ${ctx.bot.connectionId} and right(phone, 8) = ${phone.slice(-8)}
+    order by updated_at desc limit 1`;
+  return row?.lid ?? '';
 }
 
 /** #quem + pergunta: sorteia alguém do grupo e marca a pessoa. Só grupos sociais. */

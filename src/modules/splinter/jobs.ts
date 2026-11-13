@@ -65,7 +65,7 @@ export async function splinterData(ctx: BotContext, summary: boolean): Promise<s
 async function mestreSplinter(ctx: BotContext): Promise<void> {
   const repo = new SplinterRepo(ctx.sql);
   const ch = await repo.activeChallenge(ctx.bot.id);
-  if (!ch) return;
+  if (!ch || ch.paused) return; // pausado: sem resumo nem mensagens do mestre
   const hour = local(ctx.now(), ch.timezone).hour;
   const summary = hour === 4;
   const interval = Math.max(1, ch.persona_interval_h);

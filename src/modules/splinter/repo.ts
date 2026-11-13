@@ -39,6 +39,38 @@ export class SplinterRepo {
     await this.sql`update splinter_challenges set ${this.sql({ [flag]: on })} where id = ${challengeId}`;
   }
 
+  async setPaused(challengeId: string, paused: boolean, by: string): Promise<void> {
+    await this.sql`update splinter_challenges set paused = ${paused}, paused_at = ${paused ? new Date() : null},
+      paused_by = ${paused ? by : null} where id = ${challengeId}`;
+  }
+
+  /** Passo da confirmação do #reiniciar (0 = nenhum pedido em andamento). */
+  async setResetStep(challengeId: string, step: number, by: string | null, at: Date | null): Promise<void> {
+    await this.sql`update splinter_challenges set reset_step = ${step}, reset_by = ${by}, reset_asked_at = ${at}
+      where id = ${challengeId}`;
+  }
+
+  /**
+   * Zera a pontuação: guarda o ranking de antes e uma cópia de todos os check-ins no arquivo,
+   * depois tira os check-ins do desafio. Participantes, equipes, locais e poses continuam.
+   */
+  async resetScores(challengeId: string, by: string): Promise<{ checkins: number }> {
+    const ranking = await this.ranking(challengeId);
+    return this.sql.begin(async (tx) => {
+      const [reset] = await tx<{ id: number }[]>`
+        insert into splinter_resets (challenge_id, done_by, checkins, ranking)
+        values (${challengeId}, ${by}, 0, ${tx.json(ranking as never)}) returning id`;
+      const moved = await tx`
+        insert into splinter_checkins_arquivo (reset_id, checkin, photo_sha256)
+        select ${reset!.id}, to_jsonb(c), c.photo_sha256 from splinter_checkins c where c.challenge_id = ${challengeId}
+        returning id`;
+      await tx`delete from splinter_checkins where challenge_id = ${challengeId}`;
+      await tx`update splinter_resets set checkins = ${moved.length} where id = ${reset!.id}`;
+      await tx`update splinter_challenges set reset_step = 0, reset_by = null, reset_asked_at = null where id = ${challengeId}`;
+      return { checkins: moved.length };
+    });
+  }
+
   async participantByPhone(challengeId: string, phone: string): Promise<Participant | null> {
     if (digits(phone).length < 8) return null;
     const rows = await this.sql<Participant[]>`
@@ -65,12 +97,16 @@ export class SplinterRepo {
     return r?.n ?? 0;
   }
 
-  /** A mesma foto (hash do WhatsApp) já foi usada em qualquer desafio deste bot? */
+  /** A mesma foto (hash do WhatsApp) já foi usada em qualquer desafio deste bot, mesmo antes de um #reiniciar? */
   async photoUsed(botId: string, sha256: string): Promise<boolean> {
     if (!sha256) return false;
     const rows = await this.sql`
       select 1 from splinter_checkins c join splinter_challenges ch on ch.id = c.challenge_id
-      where ch.bot_id = ${botId} and c.photo_sha256 = ${sha256} limit 1`;
+      where ch.bot_id = ${botId} and c.photo_sha256 = ${sha256}
+      union all
+      select 1 from splinter_checkins_arquivo a join splinter_resets r on r.id = a.reset_id
+      join splinter_challenges ch on ch.id = r.challenge_id
+      where ch.bot_id = ${botId} and a.photo_sha256 = ${sha256} limit 1`;
     return rows.length > 0;
   }
 

@@ -31,7 +31,7 @@ describe('#quem', () => {
     w.ai.textAnswer = '[SORTEADO] vai mandar um ifood para a Ana. 🍔';
     for (let i = 0; i < 5; i++) {
       await w.send({ phone: ANA, name: 'Ana', at: '2026-11-09T12:01:00Z', text: '#Quem vai mandar um ifood pra mim?' });
-      expect(w.wa.last()).toBe(`🎲 @${BRUNO} vai mandar um ifood para a Ana. 🍔`);
+      expect(w.wa.last()).toBe(`🎲 @${BRUNO} vai mandar um ifood para a Ana. 🍔`); // Bruno ainda não falou: sem nome
       expect(mentioned.at(-1)).toEqual([`${BRUNO}@s.whatsapp.net`]);
     }
     expect(w.ai.prompts.at(-1)).toContain('vai mandar um ifood pra mim?');
@@ -41,6 +41,18 @@ describe('#quem', () => {
     w.ai.textAnswer = 'qualquer coisa';
     await w.send({ phone: ANA, name: 'Ana', at: '2026-11-09T12:02:00Z', text: '#quem paga a cerveja pra mim?' });
     expect(w.wa.last()).toBe(`🎲 @${BRUNO} paga a cerveja para Ana.`);
+
+    // com nome conhecido e sem LID: número marcado + nome
+    await w.send({ phone: BRUNO, name: 'Bruno', at: '2026-11-09T12:03:00Z', text: 'oi' });
+    w.ai.textAnswer = '[SORTEADO] paga a pizza.';
+    await w.send({ phone: ANA, name: 'Ana', at: '2026-11-09T12:04:00Z', text: '#quem paga a pizza?' });
+    expect(w.wa.last()).toBe(`🎲 @${BRUNO} (*Bruno*) paga a pizza.`);
+
+    // com LID: marca pelo LID, que o celular mostra como nome
+    w.wa.members[1] = { jid: `${BRUNO}@s.whatsapp.net`, lid: '99887766@lid', phone: BRUNO };
+    await w.send({ phone: ANA, name: 'Ana', at: '2026-11-09T12:05:00Z', text: '#quem paga a pizza?' });
+    expect(w.wa.last()).toBe('🎲 @99887766 paga a pizza.');
+    expect(mentioned.at(-1)).toEqual(['99887766@lid']);
   });
 
   it('sem menções no provedor, manda o nome em negrito', async () => {
@@ -50,6 +62,15 @@ describe('#quem', () => {
     w.ai.textAnswer = '[SORTEADO] vai lavar a louça.';
     await w.send({ phone: ANA, name: 'Ana', at: '2026-11-09T12:01:00Z', text: '#quem vai lavar a louça?' });
     expect(w.wa.last()).toBe('🎲 *Bruno* vai lavar a louça.');
+  });
+
+  it('se a AvisaAPI não devolver o grupo, sorteia entre quem já falou', async () => {
+    w = await world();
+    w.wa.members = [];
+    await w.send({ phone: BRUNO, name: 'Bruno', at: '2026-11-09T12:00:00Z', text: 'oi' });
+    w.ai.textAnswer = '[SORTEADO] vai pagar o açaí.';
+    await w.send({ phone: ANA, name: 'Ana', at: '2026-11-09T12:01:00Z', text: '#quem vai pagar o açaí?' });
+    expect(w.wa.last()).toBe('🎲 *Bruno* vai pagar o açaí.');
   });
 
   it('frase sem IA troca mim/comigo pelo nome', () => {

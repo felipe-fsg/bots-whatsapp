@@ -22,6 +22,12 @@ export interface Challenge {
   daily_summary: boolean;
   persona_messages: boolean;
   persona_interval_h: number;
+  paused: boolean;
+  paused_at: Date | null;
+  paused_by: string | null;
+  reset_step: number;
+  reset_by: string | null;
+  reset_asked_at: Date | null;
 }
 
 export interface Rule {
