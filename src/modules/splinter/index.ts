@@ -55,15 +55,13 @@ export const splinter: BotModule = {
 async function checkinPhoto(ctx: BotContext, repo: SplinterRepo, ch: Challenge, msg: InboundMessage) {
   const rules = await repo.rules(ch.id);
   const rule = findRule(msg.text, rules);
-  if (!rule) {
-    const off = findDisabledRule(msg.text, rules);
-    if (off) return ctx.reply(M.activityOff(msg.pushName, off.category));
-    return; // foto sem hashtag de categoria é conversa normal
-  }
+  const off = rule ? undefined : findDisabledRule(msg.text, rules);
+  if (!rule && !off) return; // foto sem hashtag de categoria é conversa normal
 
   const participant = await repo.participantByPhone(ch.id, msg.senderPhone);
-  const day = localDay(msg.timestamp, ch.timezone);
   if (!participant?.active) return ctx.reply(M.notEnrolled(msg.pushName));
+  if (!rule) return ctx.reply(M.activityOff(msg.pushName, off!.category));
+  const day = localDay(msg.timestamp, ch.timezone);
   if (!inPeriod(day, localTime(msg.timestamp, ch.timezone), ch)) return ctx.reply(M.outOfPeriod(msg.pushName, ch.checkin_deadline));
 
   const sha = msg.image?.sha256 ?? '';
@@ -187,7 +185,17 @@ async function postPose(ctx: BotContext, repo: SplinterRepo, ch: Challenge, msg:
   );
 }
 
+const PARTICIPANT_COMMANDS = new Set<Command['type']>(['ranking', 'equipes', 'regras', 'atividades']);
+
 async function runCommand(ctx: BotContext, repo: SplinterRepo, ch: Challenge, msg: InboundMessage, cmd: Command) {
+  // quem não está inscrito recebe a orientação para falar com um admin (admins podem ver tudo)
+  if (PARTICIPANT_COMMANDS.has(cmd.type) && !(await ctx.isAdmin(msg.senderPhone))) {
+    const p = await repo.participantByPhone(ch.id, msg.senderPhone);
+    if (!p?.active) {
+      if (cmd.type === 'regras') return ctx.reply(`${M.rulesText(ch, await repo.rules(ch.id))}\n\n${M.notEnrolled(msg.pushName)}`);
+      return ctx.reply(M.notEnrolled(msg.pushName));
+    }
+  }
   switch (cmd.type) {
     case 'ranking':
       return ctx.reply(M.rankingText(ch.name, await repo.ranking(ch.id)));

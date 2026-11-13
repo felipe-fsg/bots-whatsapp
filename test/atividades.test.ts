@@ -82,3 +82,23 @@ describe('#ativar / #desativar no grupo', () => {
     expect(w.wa.last()).toContain('Já estava desativado: Resumo diário das 4h');
   });
 });
+
+describe('quem não está inscrito', () => {
+  it('recebe a orientação nos comandos do desafio; admin vê normal', async () => {
+    w = await world();
+    const FORA = '5511933333333';
+    await w.send({ phone: FORA, name: 'Carla', at: '2026-11-09T10:00:00Z', text: '#RANKING' });
+    expect(w.wa.last()).toContain('ainda não está inscrito');
+    expect(w.wa.last()).toContain('admins');
+
+    await w.send({ phone: FORA, at: '2026-11-09T10:01:00Z', text: '#regras' });
+    expect(w.wa.last()).toContain('Regras');
+    expect(w.wa.last()).toContain('ainda não está inscrito');
+
+    await w.send({ phone: FORA, at: '2026-11-09T10:02:00Z', image: { sha: 'x1', caption: '#cardio' } });
+    expect(w.wa.last()).toContain('ainda não está inscrito');
+
+    await w.send({ phone: ANA, at: '2026-11-09T10:03:00Z', text: '#ranking' });
+    expect(w.wa.last()).not.toContain('não está inscrito');
+  });
+});
