@@ -130,9 +130,9 @@ export class QdrantBase implements KnowledgeBase {
     return { points: Number(r.result?.points_count ?? 0), size: vectors?.size ?? vectors?.['']?.size ?? null };
   }
 
-  /** Índices de texto exato em metadata.id e metadata.tipo (para contar e evitar duplicar). Pode rodar de novo. */
+  /** Índices de texto exato em metadata.id, tipo e documento (para contar e evitar duplicar). Pode rodar de novo. */
   async ensureIndexes(): Promise<void> {
-    for (const field_name of ['metadata.id', 'metadata.tipo']) {
+    for (const field_name of ['metadata.id', 'metadata.tipo', 'metadata.documento']) {
       await this.call('PUT', '/index?wait=true', { field_name, field_schema: 'keyword' });
     }
   }
@@ -140,6 +140,24 @@ export class QdrantBase implements KnowledgeBase {
   async count(field: string, value: string): Promise<number> {
     const r = await this.call('POST', '/points/count', { exact: true, filter: { must: [{ key: field, match: { value } }] } });
     return Number(r.result?.count ?? 0);
+  }
+
+  /** Todos os ids de ficha (metadata.id) cujo campo `field` vale `value`. */
+  async idsWhere(field: string, value: string): Promise<string[]> {
+    const ids: string[] = [];
+    let offset: unknown = undefined;
+    do {
+      const r = await this.call('POST', '/points/scroll', {
+        limit: 1000,
+        offset,
+        with_payload: ['metadata.id'],
+        with_vector: false,
+        filter: { must: [{ key: field, match: { value } }] },
+      });
+      for (const p of r.result?.points ?? []) ids.push(String(p.payload?.metadata?.id ?? ''));
+      offset = r.result?.next_page_offset ?? undefined;
+    } while (offset != null);
+    return ids;
   }
 
   /** Quais desses ids de ficha (metadata.id) já estão na base. */
