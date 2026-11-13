@@ -15,7 +15,8 @@ export class Contacts implements ContactResolver {
   ) {}
 
   async learn(lid: string | undefined, phone: string): Promise<void> {
-    if (!lid || !lid.endsWith('@lid') || digits(phone).length < 10) return;
+    // Em grupos que só mandam o LID, o "telefone" da lista são os dígitos do próprio LID: isso não é telefone.
+    if (!lid || !lid.endsWith('@lid') || digits(phone).length < 10 || digits(phone) === digits(lid)) return;
     await this.sql`
       insert into wa_contacts (connection_id, lid, phone) values (${this.connectionId}, ${lid}, ${digits(phone)})
       on conflict (connection_id, lid) do update set phone = excluded.phone, updated_at = now()`;
@@ -26,11 +27,12 @@ export class Contacts implements ContactResolver {
     if (jid.endsWith('@s.whatsapp.net')) return digits(jid);
     const known = await this.sql<{ phone: string }[]>`
       select phone from wa_contacts where connection_id = ${this.connectionId} and lid = ${jid}`;
-    if (known[0]) return known[0].phone;
+    if (known[0] && digits(known[0].phone) !== digits(jid)) return known[0].phone;
 
     const members = await this.wa.listGroupMembers(chatJid);
     for (const m of members) await this.learn(m.lid, m.phone);
     const found = members.find((m) => m.lid === jid || m.jid === jid);
-    return found ? digits(found.phone) : '';
+    const phone = found ? digits(found.phone) : '';
+    return phone === digits(jid) ? '' : phone;
   }
 }

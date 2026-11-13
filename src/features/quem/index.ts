@@ -1,5 +1,6 @@
-import type { BotContext, BotModule, GroupMember, InboundMessage } from '../../core/types.js';
-import { digits, samePhone } from '../../core/phone.js';
+import type { BotContext, BotModule, InboundMessage } from '../../core/types.js';
+import { samePhone } from '../../core/phone.js';
+import { mentionableMembers } from '../../core/members.js';
 import { prettyPhone } from '../boasvindas/index.js';
 
 const MAX = 200;
@@ -28,36 +29,8 @@ export function quemFallback(question: string, asker: string): string {
   return `${SLOT} ${q}.`;
 }
 
-function jidOf(m: GroupMember): string {
-  return digits(m.phone).length >= 8 ? `${digits(m.phone)}@s.whatsapp.net` : m.jid;
-}
-
-/** Lista do grupo na AvisaAPI (tenta 2 vezes). Se não vier, usa quem o bot já viu no grupo. */
-async function groupMembers(ctx: BotContext): Promise<GroupMember[]> {
-  for (let i = 0; i < 2; i++) {
-    try {
-      const list = await ctx.wa.listGroupMembers(ctx.bot.chatJid);
-      if (list.length) return list;
-      ctx.log.warn({ chat: ctx.bot.chatJid }, '#quem: a AvisaAPI devolveu o grupo sem membros');
-    } catch (err) {
-      ctx.log.warn({ err: String(err) }, '#quem: não consegui listar o grupo');
-    }
-  }
-  const rows = await ctx.sql<{ phone: string }[]>`
-    select phone from member_message_counts where bot_id = ${ctx.bot.id}
-    union
-    select phone from member_activity where bot_id = ${ctx.bot.id}`;
-  const seen = new Set<string>();
-  return rows
-    .map((r) => digits(r.phone))
-    .filter((p) => p.length >= 8 && !seen.has(p.slice(-8)) && seen.add(p.slice(-8)))
-    .map((p) => ({ jid: `${p}@s.whatsapp.net`, phone: p }));
-}
-
 async function draw(ctx: BotContext, msg: InboundMessage, question: string): Promise<void> {
-  const members = await groupMembers(ctx);
-  const [conn] = await ctx.sql<{ own_phone: string | null }[]>`select own_phone from wa_connections where id = ${ctx.bot.connectionId}`;
-  const all = members.filter((m) => jidOf(m) && !(conn?.own_phone && samePhone(conn.own_phone, m.phone)));
+  const all = await mentionableMembers(ctx, '#quem');
   // Quem perguntou não é sorteado (a não ser que esteja sozinho com o bot).
   const others = all.filter((m) => !(msg.senderPhone && samePhone(msg.senderPhone, m.phone)));
   const pool = others.length ? others : all;
@@ -82,7 +55,7 @@ async function draw(ctx: BotContext, msg: InboundMessage, question: string): Pro
     try {
       // A AvisaAPI só marca de verdade pelo telefone (pelo LID a marcação não pega). Pelo telefone, o celular
       // de quem não tem o contato salvo mostra só o número, então o nome vai junto.
-      const jid = jidOf(chosen);
+      const jid = chosen.jid;
       const tag = `@${jid.split('@')[0]}${name ? ` (*${name}*)` : ''}`;
       return await ctx.wa.sendTextMentions(ctx.bot.chatJid, `🎲 ${sentence.replace(SLOT, tag)}`, [jid]);
     } catch (err) {
