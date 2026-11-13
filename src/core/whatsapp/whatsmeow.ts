@@ -38,7 +38,12 @@ export function parseWhatsmeowEvent(raw: Json, image?: { data: Buffer; mime: str
   const info = ev?.Info;
   if (!info?.ID || !info?.Chat) return null;
 
-  const m = unwrap(ev.Message);
+  let m = unwrap(ev.Message);
+  // Legenda editada depois do envio: vem como protocolMessage com a mensagem nova e o ID da original.
+  const proto = m.protocolMessage ?? unwrap(ev.RawMessage).protocolMessage;
+  const edited = proto?.editedMessage ? unwrap(proto.editedMessage) : null;
+  const editOf = edited ? String(proto.key?.ID ?? proto.key?.id ?? '') : '';
+  if (edited && m.protocolMessage) m = edited;
   // Quem adiciona alguém e compartilha o histórico manda este aviso com o LID de quem entrou.
   const receivers = m.messageHistoryNotice?.messageHistoryMetadata?.historyReceivers;
   if (Array.isArray(receivers) && receivers.length && String(info.Chat).endsWith('@g.us')) {
@@ -67,7 +72,9 @@ export function parseWhatsmeowEvent(raw: Json, image?: { data: Buffer; mime: str
   const phoneJid = [senderAlt, sender].find((j) => j.endsWith('@s.whatsapp.net')) ?? '';
   const lid = [sender, senderAlt].find((j) => j.endsWith('@lid'));
 
-  const type: InboundMessage['type'] = img ? 'image' : loc ? 'location' : m.conversation || ext ? 'text' : 'other';
+  let type: InboundMessage['type'] = img ? 'image' : loc ? 'location' : m.conversation || ext ? 'text' : 'other';
+  // Só a edição de legenda de foto interessa (check-in); texto editado não roda comando de novo.
+  if (editOf && type !== 'image') type = 'other';
 
   const msg: InboundMessage = {
     id: String(info.ID),
@@ -82,6 +89,10 @@ export function parseWhatsmeowEvent(raw: Json, image?: { data: Buffer; mime: str
     mentions: [...new Set<string>((ctx.mentionedJID ?? []).map(String))],
   };
   if (lid) msg.senderLid = lid;
+  if (editOf && type === 'image') {
+    msg.editOf = editOf;
+    msg.id = `edit:${msg.id}`; // não confunde com a foto original na checagem de repetidas
+  }
   if (img) {
     msg.image = { sha256: String(img.fileSHA256 ?? ''), mime: String(img.mimetype ?? image?.mime ?? 'image/jpeg') };
     if (image?.data) msg.image.data = image.data;
@@ -95,7 +106,9 @@ export function parseWhatsmeowEvent(raw: Json, image?: { data: Buffer; mime: str
       participant: String(ctx.participant ?? ''),
       text: quotedText(ctx.quotedMessage),
     };
-    const ql = ctx.quotedMessage ? unwrap(ctx.quotedMessage).locationMessage : undefined;
+    const qm = ctx.quotedMessage ? unwrap(ctx.quotedMessage) : {};
+    if (qm.imageMessage) msg.quoted.image = { sha256: String(qm.imageMessage.fileSHA256 ?? '') };
+    const ql = qm.locationMessage;
     if (typeof ql?.degreesLatitude === 'number' && typeof ql?.degreesLongitude === 'number') {
       msg.quoted.location = { lat: ql.degreesLatitude, lng: ql.degreesLongitude };
     }

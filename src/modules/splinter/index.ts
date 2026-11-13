@@ -11,6 +11,7 @@ import {
   decide,
   findDisabledRule,
   findRule,
+  findRuleLoose,
   hashtags,
   inPeriod,
   parseCommand,
@@ -23,6 +24,7 @@ import * as P from './prompts.js';
 import { displayName, type Challenge, type Participant, type Rule } from './types.js';
 import { splinterJobs } from './jobs.js';
 import { activitiesText, toggleActivities } from './atividades.js';
+import { rememberPhoto, rememberTag, takePhoto, takeTag } from './pendentes.js';
 import { answerReset, askReset, togglePause } from './controle.js';
 
 export const splinter: BotModule = {
@@ -44,20 +46,50 @@ export const splinter: BotModule = {
     }
 
     const ch = await repo.activeChallenge(ctx.bot.id);
-    if (!ch) return;
+    if (!ch) {
+      if (msg.type === 'image' && hashtags(msg.text).length) ctx.log.info({ bot: ctx.bot.id, tags: hashtags(msg.text) }, 'splinter: foto com hashtag, mas sem desafio ativo');
+      return;
+    }
     if (msg.type === 'image') {
       if (hashtags(msg.text).includes(POSE_TAG)) return postPose(ctx, repo, ch, msg);
+      if (msg.editOf) return editedCaption(ctx, repo, ch, msg);
       return checkinPhoto(ctx, repo, ch, msg);
     }
     if (msg.type === 'location') return checkinLocation(ctx, repo, ch, msg);
+    if (msg.type === 'text') return lateHashtag(ctx, repo, ch, msg);
   },
 };
 
-async function checkinPhoto(ctx: BotContext, repo: SplinterRepo, ch: Challenge, msg: InboundMessage) {
+/** Categoria da legenda: hashtag exata ou, se não houver, uma variação clara (#treinos, #treinei). */
+function ruleOf(text: string, rules: Rule[]): { rule?: Rule; off?: Rule } {
+  const rule = findRule(text, rules);
+  if (rule) return { rule };
+  const off = findDisabledRule(text, rules);
+  if (off) return { off };
+  const loose = findRuleLoose(text, rules);
+  return loose?.active ? { rule: loose } : loose ? { off: loose } : {};
+}
+
+/**
+ * Foto de check-in. `caption` é de onde vem a hashtag: a legenda da própria foto ou
+ * uma mensagem mandada logo antes/depois (ou em resposta à foto), ou a legenda editada.
+ */
+async function checkinPhoto(ctx: BotContext, repo: SplinterRepo, ch: Challenge, msg: InboundMessage, caption = msg.text) {
   const rules = await repo.rules(ch.id);
-  const rule = findRule(msg.text, rules);
-  const off = rule ? undefined : findDisabledRule(msg.text, rules);
-  if (!rule && !off) return; // foto sem hashtag de categoria é conversa normal
+  let { rule, off } = ruleOf(caption, rules);
+  if (caption === msg.text) {
+    // Hashtag mandada numa mensagem logo antes da foto? (se a foto já tem, a de antes é descartada)
+    const tag = takeTag(ctx.bot.id, msg.senderPhone, msg.timestamp);
+    if (tag && !rule && !off) ({ rule, off } = ruleOf(tag, rules));
+    // foto sem hashtag guardada antes desta não pega carona numa hashtag que vier depois
+    if (rule || off) takePhoto(ctx.bot.id, msg.senderPhone, msg.timestamp);
+  }
+  if (!rule && !off) {
+    // foto sem hashtag de categoria é conversa normal, mas a hashtag pode vir logo depois
+    if (msg.senderPhone) rememberPhoto(ctx.bot.id, msg);
+    ctx.log.info({ bot: ctx.bot.id, sender: msg.senderPhone ? `…${msg.senderPhone.slice(-4)}` : '', tags: hashtags(caption) }, 'splinter: foto sem hashtag de categoria');
+    return;
+  }
 
   const participant = await repo.participantByPhone(ch.id, msg.senderPhone);
   if (!participant?.active) return ctx.reply(M.notEnrolled(msg.pushName));
@@ -91,7 +123,10 @@ async function checkinPhoto(ctx: BotContext, repo: SplinterRepo, ch: Challenge, 
     sha256: sha,
     aiAnalysis: analysis,
   });
-  if (!saved) return;
+  if (!saved) {
+    ctx.log.info({ bot: ctx.bot.id, messageId: msg.id }, 'splinter: check-in desta foto já registrado');
+    return;
+  }
 
   if (d.status !== 'valido' || ch.confirm_valid) {
     await ctx.reply(
@@ -104,6 +139,41 @@ async function checkinPhoto(ctx: BotContext, repo: SplinterRepo, ch: Challenge, 
       }),
     );
   }
+}
+
+/**
+ * Mensagem de texto com hashtag de categoria: junta com a foto que a pessoa mandou
+ * sem hashtag (respondendo à foto, ou logo depois dela). Sem foto ainda, guarda a
+ * hashtag por alguns minutos para a foto que vier em seguida.
+ */
+async function lateHashtag(ctx: BotContext, repo: SplinterRepo, ch: Challenge, msg: InboundMessage) {
+  if (!msg.senderPhone || msg.text.length > 80) return;
+  const rules = await repo.rules(ch.id);
+  const { rule, off } = ruleOf(msg.text, rules);
+  if (!rule && !off) return;
+
+  if (msg.quoted) {
+    const author = await ctx.contacts.phoneOf(msg.quoted.participant, msg.chatJid);
+    if (author && !samePhone(author, msg.senderPhone)) return; // foto de outra pessoa
+    const cached = takePhoto(ctx.bot.id, msg.senderPhone, msg.timestamp, msg.quoted.messageId);
+    if (cached) return checkinPhoto(ctx, repo, ch, cached, msg.text);
+    if (msg.quoted.image) {
+      const photo: InboundMessage = { ...msg, id: msg.quoted.messageId, type: 'image', image: { sha256: msg.quoted.image.sha256, mime: 'image/jpeg' } };
+      return checkinPhoto(ctx, repo, ch, photo, msg.text);
+    }
+    return;
+  }
+
+  const photo = takePhoto(ctx.bot.id, msg.senderPhone, msg.timestamp);
+  if (photo) return checkinPhoto(ctx, repo, ch, photo, msg.text);
+  rememberTag(ctx.bot.id, msg.senderPhone, msg.text, msg.timestamp);
+}
+
+/** A pessoa editou a legenda da foto para pôr a hashtag. */
+async function editedCaption(ctx: BotContext, repo: SplinterRepo, ch: Challenge, msg: InboundMessage) {
+  const original = takePhoto(ctx.bot.id, msg.senderPhone, msg.timestamp, msg.editOf);
+  const photo: InboundMessage = original ?? { ...msg, id: msg.editOf! };
+  return checkinPhoto(ctx, repo, ch, photo, msg.text);
 }
 
 async function judgeFood(ctx: BotContext, repo: SplinterRepo, ch: Challenge, msg: InboundMessage, d: Decision) {
