@@ -66,9 +66,11 @@ export class AvisaClient implements WhatsAppProvider {
   /**
    * Liga ou desliga o "só admins mandam mensagens" (announce do WhatsApp). O número do bot precisa ser admin.
    * A AvisaAPI não publica a rota disso; tentamos as usadas por APIs baseadas no whatsmeow e conferimos
-   * na lista de grupos (campo IsAnnounce) se mudou mesmo. A primeira que funcionar fica guardada.
+   * na lista de grupos (campo IsAnnounce) se mudou mesmo. A rota confirmada fica guardada.
+   * Devolve 'ok' (conferido) ou 'unverified' (a AvisaAPI aceitou, mas a lista não mostra o grupo).
+   * `trace` recebe o que cada tentativa respondeu, para achar a rota certa nos logs.
    */
-  async setAdminsOnly(chatJid: string, on: boolean): Promise<void> {
+  async setAdminsOnly(chatJid: string, on: boolean, trace: string[] = []): Promise<'ok' | 'unverified'> {
     const attempts: { path: string; body: unknown }[] = [
       { path: '/group/announce', body: { groupId: chatJid, announce: on, GroupJID: chatJid, Announce: on } },
       { path: '/group/update', body: { groupId: chatJid, action: on ? 'announcement' : 'not_announcement' } },
@@ -77,7 +79,7 @@ export class AvisaClient implements WhatsAppProvider {
     const all = attempts.map((_, i) => i);
     const route = this.announceRoute;
     const order = route === undefined ? all : [route, ...all.filter((i) => i !== route)];
-    const errors: string[] = [];
+    let accepted = false;
     for (const i of order) {
       const a = attempts[i]!;
       try {
@@ -85,19 +87,21 @@ export class AvisaClient implements WhatsAppProvider {
         const r: any = await this.call('POST', a.path, a.body);
         const code = Number(r?.data?.code ?? r?.code ?? 200);
         if (r?.status === false || r?.success === false || r?.data?.success === false || code >= 400) {
-          throw new Error(JSON.stringify(r).slice(0, 200));
+          throw new Error(JSON.stringify(r).slice(0, 300));
         }
-        const now = await this.isAdminsOnly(chatJid).catch(() => undefined);
-        if (now === undefined || now === on) {
+        const now = await this.isAdminsOnly(chatJid).catch((err) => `erro na lista: ${String(err).slice(0, 150)}`);
+        trace.push(`${a.path}: respondeu ${JSON.stringify(r).slice(0, 300)}; IsAnnounce depois = ${String(now)}`);
+        if (now === on) {
           this.announceRoute = i;
-          return;
+          return 'ok';
         }
-        errors.push(`${a.path}: respondeu OK mas o grupo não mudou`);
+        if (typeof now !== 'boolean') accepted = true;
       } catch (err) {
-        errors.push(`${a.path}: ${String(err).slice(0, 200)}`);
+        trace.push(`${a.path}: ${String(err).slice(0, 300)}`);
       }
     }
-    throw new Error(`AvisaAPI não mudou o grupo: ${errors.join(' | ')}`);
+    if (accepted) return 'unverified';
+    throw new Error(`AvisaAPI não mudou o grupo: ${trace.join(' | ')}`);
   }
 
   private announceRoute?: number;

@@ -16,13 +16,22 @@ export const grupo: BotModule = {
       await ctx.reply(adminOnly(close ? 'fechar o grupo' : 'abrir o grupo'));
       return true;
     }
+    const trace: string[] = [];
+    let result: 'ok' | 'unverified' | void;
     try {
       if (!ctx.wa.setAdminsOnly) throw new Error('provedor não muda a configuração do grupo');
-      await ctx.wa.setAdminsOnly(msg.chatJid, close);
+      result = await ctx.wa.setAdminsOnly(msg.chatJid, close, trace);
     } catch (err) {
-      ctx.log.warn({ err: String(err) }, close ? 'não consegui fechar o grupo' : 'não consegui abrir o grupo');
+      ctx.log.warn({ err: String(err), trace }, close ? 'fechargrupo: não consegui fechar o grupo' : 'abrirgrupo: não consegui abrir o grupo');
       await ctx.reply(
         `🛡️ Não consegui ${close ? 'fechar' : 'abrir'} o grupo sozinho (o número do bot precisa ser admin do grupo). Admins, mudem pelo WhatsApp em Dados do grupo > Configurações do grupo > Enviar mensagens, por favor.`,
+      );
+      return true;
+    }
+    ctx.log.info({ result, trace }, close ? 'fechargrupo: resultado' : 'abrirgrupo: resultado');
+    if (result === 'unverified') {
+      await ctx.reply(
+        `🛡️ Pedi para ${close ? 'fechar' : 'abrir'} o grupo, mas não consegui conferir se mudou. Se não mudou, admins, mudem pelo WhatsApp em Dados do grupo > Configurações do grupo > Enviar mensagens.`,
       );
       return true;
     }

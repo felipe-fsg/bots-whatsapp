@@ -98,4 +98,14 @@ describe('AvisaClient.setAdminsOnly', () => {
     const c = new AvisaClient('https://api.exemplo/api', 'tok', fake);
     await expect(c.setAdminsOnly('123@g.us', true)).rejects.toThrow('não mudou o grupo');
   });
+
+  it('diz "unverified" quando a AvisaAPI aceita mas a lista não traz o grupo', async () => {
+    const fake = (async (url: string) =>
+      url.endsWith('/group/list') ? new Response(JSON.stringify({ data: { Groups: [] } })) : new Response(JSON.stringify({ status: true }))) as unknown as typeof fetch;
+    const c = new AvisaClient('https://api.exemplo/api', 'tok', fake);
+    const trace: string[] = [];
+    expect(await c.setAdminsOnly('123@g.us', true, trace)).toBe('unverified');
+    expect(trace).toHaveLength(3);
+    expect(trace[0]).toContain('/group/announce: respondeu');
+  });
 });
