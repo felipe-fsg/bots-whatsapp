@@ -11,6 +11,12 @@ export function findRule(text: string, rules: Rule[]): Rule | undefined {
   return rules.find((r) => r.active && tags.has(r.hashtag.toLowerCase().trim()));
 }
 
+/** Regra desativada pelos admins cuja hashtag aparece na legenda (para avisar que não vale ponto). */
+export function findDisabledRule(text: string, rules: Rule[]): Rule | undefined {
+  const tags = new Set(hashtags(text));
+  return rules.find((r) => !r.active && tags.has(r.hashtag.toLowerCase().trim()));
+}
+
 /** A foto vale para o dia em que foi mandada, até o horário limite, dentro das datas do desafio. */
 export function inPeriod(day: string, time: string, ch: Pick<Challenge, 'starts_on' | 'ends_on' | 'checkin_deadline'>): boolean {
   return day >= ch.starts_on && day <= ch.ends_on && time <= ch.checkin_deadline;
@@ -84,7 +90,9 @@ export type Command =
   | { type: 'equipe'; name: string }
   | { type: 'meulocal'; name: string }
   | { type: 'motivacao' }
-  | { type: 'ajuda' };
+  | { type: 'ajuda' }
+  | { type: 'atividades' }
+  | { type: 'ativar'; on: boolean; names: string[] };
 
 /** Comandos de texto. '!' ainda é aceito nos comandos antigos. */
 export function parseCommand(text: string): Command | null {
@@ -95,6 +103,12 @@ export function parseCommand(text: string): Command | null {
   if (/^[#!]equipes\b/i.test(t)) return { type: 'equipes' };
   if (/^[#!]regras\b/i.test(t)) return { type: 'regras' };
   if (/^[#!]pendentes\b/i.test(t)) return { type: 'pendentes' };
+  if (/^[#!]atividades(?![\p{L}\p{N}])/iu.test(t)) return { type: 'atividades' };
+  const toggle = /^[#!](ativar|desativar)(?![\p{L}\p{N}])/iu.exec(t);
+  if (toggle) {
+    const names = t.slice(toggle[0].length).split(/[\s,;]+/).map((n) => n.replace(/^#+/, '')).filter(Boolean);
+    return { type: 'ativar', on: toggle[1]!.toLowerCase() === 'ativar', names };
+  }
   if (/^\?\s*[^\s?]/.test(t)) return { type: 'alimento', food: t.replace(/^\?+/, '').trim() };
   if (/^#inscrever\b/i.test(t)) return { type: 'inscrever', name: clean(t.replace(/^#inscrever/i, ''), 60) };
   if (/^#aprovar\b/i.test(t)) return { type: 'aprovar', note: t.replace(/^#aprovar/i, '').trim() };

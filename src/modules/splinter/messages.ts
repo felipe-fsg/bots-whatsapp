@@ -124,6 +124,9 @@ export function rulesText(ch: Challenge, rules: Rule[]): string {
   return L.join('\n');
 }
 
+export const activityOff = (name: string, category: string) =>
+  `⛔ ${name || 'Jovem guerreiro'}, a atividade *${category}* está desativada pelos admins neste momento. Esta foto não vale ponto.`;
+
 export const onlyAdmin = (what: string) => `🛡️ Só os admins podem ${what}.`;
 
 /** #ajuda: comandos que valem a qualquer momento, com ou sem desafio. */
@@ -145,6 +148,7 @@ export function helpText(): string {
     '',
     '🏋️ *Durante o desafio*',
     '• #regras, #ranking e #equipes',
+    '• #atividades - mostra quais atividades estão valendo ponto',
     '',
     '🛡️ *Admins*',
     '• #agendar - responda à sugestão de evento (ou: #agendar Nome | 15/11 19h | Local)',
@@ -156,5 +160,6 @@ export function helpText(): string {
     '• #ban - respondendo à mensagem de alguém, tira a pessoa do grupo',
     '• #ativarBAN / #desativarBAN - aviso semanal de quem está sumido há 7 dias (sai do grupo depois do 3º aviso)',
     '• #curiar / #nãocuriar - liga ou desliga o pedido de fotos às 10h, 15h e 21h',
+    '• #ativar / #desativar + atividade - liga ou desliga uma atividade do desafio. Ex.: #desativar pose, #ativar cardio, #desativar resumo',
   ].join('\n');
 }

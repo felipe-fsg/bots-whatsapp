@@ -9,6 +9,7 @@ import {
   applyFoodVerdict,
   applyPoseVerdict,
   decide,
+  findDisabledRule,
   findRule,
   hashtags,
   inPeriod,
@@ -21,6 +22,7 @@ import * as M from './messages.js';
 import * as P from './prompts.js';
 import { displayName, type Challenge, type Participant, type Rule } from './types.js';
 import { splinterJobs } from './jobs.js';
+import { activitiesText, toggleActivities } from './atividades.js';
 
 export const splinter: BotModule = {
   id: 'splinter',
@@ -51,8 +53,13 @@ export const splinter: BotModule = {
 };
 
 async function checkinPhoto(ctx: BotContext, repo: SplinterRepo, ch: Challenge, msg: InboundMessage) {
-  const rule = findRule(msg.text, await repo.rules(ch.id));
-  if (!rule) return; // foto sem hashtag de categoria é conversa normal
+  const rules = await repo.rules(ch.id);
+  const rule = findRule(msg.text, rules);
+  if (!rule) {
+    const off = findDisabledRule(msg.text, rules);
+    if (off) return ctx.reply(M.activityOff(msg.pushName, off.category));
+    return; // foto sem hashtag de categoria é conversa normal
+  }
 
   const participant = await repo.participantByPhone(ch.id, msg.senderPhone);
   const day = localDay(msg.timestamp, ch.timezone);
@@ -170,7 +177,11 @@ async function postPose(ctx: BotContext, repo: SplinterRepo, ch: Challenge, msg:
     postedBy: msg.pushName,
     msgId: msg.id,
   });
-  const poseTag = (await repo.rules(ch.id)).find((r) => r.kind === 'pose' && r.active)?.hashtag ?? '#pose';
+  const poseRule = (await repo.rules(ch.id)).find((r) => r.kind === 'pose');
+  if (poseRule && !poseRule.active) {
+    return ctx.reply(`🐀 Guardei a pose do dia${title ? ` (${title})` : ''}, mas a atividade ${poseRule.category} está desativada e não vale ponto. Para ligar: #ativar ${poseRule.hashtag.replace(/^#/, '')}`);
+  }
+  const poseTag = poseRule?.hashtag ?? '#pose';
   await ctx.reply(
     `🐀 A pose do dia está lançada, meus alunos!${title ? ` (${title})` : ''}\nImitem a foto acima e mandem com ${poseTag} até ${ch.checkin_deadline}.`,
   );
@@ -186,6 +197,10 @@ async function runCommand(ctx: BotContext, repo: SplinterRepo, ch: Challenge, ms
       return ctx.reply(M.rulesText(ch, await repo.rules(ch.id)));
     case 'meulocal':
       return saveOwnPlace(ctx, repo, ch, msg, cmd.name);
+    case 'atividades':
+      return ctx.reply(activitiesText(ch, await repo.rules(ch.id)));
+    case 'ativar':
+      return toggleActivities(ctx, repo, ch, msg, cmd.on, cmd.names);
   }
 
   // daqui para baixo, só admins
