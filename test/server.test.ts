@@ -66,3 +66,36 @@ describe('AvisaClient.removeParticipant', () => {
     await expect(c.removeParticipant('123@g.us', '5511922222222')).rejects.toThrow('não removeu');
   });
 });
+
+describe('AvisaClient.setAdminsOnly', () => {
+  it('tenta as rotas até o grupo mudar e lembra a que funcionou', async () => {
+    const calls: string[] = [];
+    let announce = false;
+    const fake = (async (url: string, init: any) => {
+      const path = url.replace('https://api.exemplo/api', '');
+      calls.push(`${init.method} ${path}`);
+      if (path === '/group/list') return new Response(JSON.stringify({ data: { Groups: [{ JID: '123@g.us', IsAnnounce: announce }] } }));
+      if (path === '/group/announce') return new Response('not found', { status: 404 });
+      const body = JSON.parse(init.body);
+      if (path === '/group/update') announce = body.action === 'announcement';
+      return new Response(JSON.stringify({ status: true }));
+    }) as unknown as typeof fetch;
+    const c = new AvisaClient('https://api.exemplo/api', 'tok', fake);
+    await c.setAdminsOnly('123@g.us', true);
+    expect(announce).toBe(true);
+    expect(calls).toEqual(['POST /group/announce', 'POST /group/update', 'GET /group/list']);
+    calls.length = 0;
+    await c.setAdminsOnly('123@g.us', false);
+    expect(announce).toBe(false);
+    expect(calls).toEqual(['POST /group/update', 'GET /group/list']);
+  });
+
+  it('falha quando nenhuma rota muda o grupo', async () => {
+    const fake = (async (url: string) =>
+      url.endsWith('/group/list')
+        ? new Response(JSON.stringify({ data: { Groups: [{ JID: '123@g.us', IsAnnounce: false }] } }))
+        : new Response(JSON.stringify({ status: true }))) as unknown as typeof fetch;
+    const c = new AvisaClient('https://api.exemplo/api', 'tok', fake);
+    await expect(c.setAdminsOnly('123@g.us', true)).rejects.toThrow('não mudou o grupo');
+  });
+});

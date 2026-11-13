@@ -67,6 +67,8 @@ export interface WhatsAppProvider extends WhatsAppSender {
   sendTextMentions?(chatJid: string, text: string, jids: string[]): Promise<void>;
   /** Tira alguém do grupo (o número do bot precisa ser admin do grupo). */
   removeParticipant?(chatJid: string, jid: string): Promise<void>;
+  /** Liga (true) ou desliga o "só admins mandam mensagens" do grupo. O número do bot precisa ser admin. */
+  setAdminsOnly?(chatJid: string, on: boolean): Promise<void>;
 }
 
 export interface ImageInput {
