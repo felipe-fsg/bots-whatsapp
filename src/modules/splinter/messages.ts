@@ -38,7 +38,7 @@ export function photoReply(p: {
 }
 
 export const notEnrolled = (pushName: string) =>
-  `🙋 ${pushName}, não encontrei seu número na lista de participantes. Fale com um admin para entrar no desafio.`;
+  `🙋 ${pushName || 'Jovem guerreiro'}, você ainda não está inscrito no desafio. Para entrar, fale com um dos admins do grupo: mande seu nome aqui e um admin faz sua inscrição.`;
 
 export const outOfPeriod = (pushName: string, deadline: string) =>
   `⏰ ${pushName}, essa foto chegou fora do período ou depois de ${deadline} e não vale ponto.`;
