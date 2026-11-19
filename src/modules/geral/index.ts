@@ -19,6 +19,7 @@ export function helpText(mascot: string): string {
     '• #estadocivil + sua situação - entra na lista da #pista, que mostra o estado civil da galera',
     '• #engajamento - ranking de quem mais manda mensagens no grupo',
     '• #quem + pergunta - sorteia alguém do grupo. Ex.: #quem vai mandar um ifood pra mim?',
+    '• #tarot + pergunta (opcional) - o mascote tira 3 cartas e lê a sua sorte (1 por dia). Ex.: #tarot vou passar no concurso?',
     `• Para conversar com o mascote, comece a mensagem com "${mascot.split(' ').pop()}"`,
     '',
     '🛡️ *Admins*',
