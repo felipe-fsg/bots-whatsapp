@@ -103,6 +103,98 @@ describe('aviso de sumidos (#ativarBAN)', () => {
   });
 });
 
+describe('aviso de sumidos em grupo que só manda LID', () => {
+  it('quem fala no grupo não aparece como sumido e #sumidos mostra a lista sem avisar', async () => {
+    w = await world();
+    w.wa.members = [
+      { jid: `${ADMIN}@s.whatsapp.net`, phone: ADMIN },
+      { jid: '111111111111111@lid', lid: '111111111111111@lid', phone: '111111111111111' },
+      { jid: '222222222222222@lid', lid: '222222222222222@lid', phone: '222222222222222' },
+      { jid: '333333333333333@lid', lid: '333333333333333@lid', phone: '333333333333333' },
+    ];
+    // o bot já aprendeu o telefone de Ana e Bruno pelas mensagens; o terceiro nunca falou
+    await w.sql`insert into wa_contacts (connection_id, lid, phone)
+      select id, '111111111111111@lid', ${ANA} from wa_connections union all
+      select id, '222222222222222@lid', ${BRUNO} from wa_connections`;
+
+    w.now.value = at(9);
+    await w.send({ phone: ADMIN, name: 'Felipe', at: '2026-11-09T15:01:00Z', text: '#ativarBAN' });
+    expect(w.wa.last()).toContain('primeiro aviso pode sair na segunda 16/11');
+
+    await w.send({ phone: ADMIN, at: '2026-11-10T15:00:00Z', text: '#sumidos' });
+    expect(w.wa.last()).toContain('Ligado desde 09/11');
+    expect(w.wa.last()).toContain('Hoje ninguém seria avisado');
+    expect(w.wa.last()).toContain('1 nunca falaram');
+
+    // Ana fala todo dia; Bruno sumiu
+    for (const d of [12, 14, 15]) await w.send({ phone: ANA, name: 'Ana', at: `2026-11-${d}T12:00:00Z`, text: 'oi' });
+    await w.send({ phone: BRUNO, name: 'Bruno', at: '2026-11-09T14:00:00Z', text: 'oi' });
+
+    w.now.value = at(16, 13);
+    w.wa.clear();
+    await w.send({ phone: ADMIN, at: '2026-11-16T16:00:00Z', text: '#sumidos' });
+    expect(w.wa.last()).toContain('esta pessoa seria avisada');
+    expect(w.wa.last()).toContain('*Bruno* (+55 11 92222-2222): 7 dias sem interagir, 0 de 3 avisos');
+    expect(w.wa.last()).not.toContain('Ana');
+    expect(w.wa.last()).toContain('Mais 1 sem número conhecido');
+
+    w.now.value = at(16);
+    w.wa.clear();
+    await weeklyCheck(await ctxOf(w));
+    expect(w.wa.sent).toHaveLength(1);
+    expect(w.wa.last()).toContain('Bruno');
+    expect(w.wa.last()).toContain('aviso 1 de 3');
+    expect(w.wa.last()).not.toContain('Ana');
+    expect(w.wa.last()).not.toContain('3333333');
+
+    // na semana seguinte Ana continua contando (o registro dela não foi apagado)
+    await w.send({ phone: ANA, name: 'Ana', at: '2026-11-20T12:00:00Z', text: 'oi' });
+    w.now.value = at(23);
+    w.wa.clear();
+    await weeklyCheck(await ctxOf(w));
+    expect(w.wa.last()).toContain('aviso 2 de 3');
+    expect(w.wa.last()).not.toContain('Ana');
+  });
+
+  it('#carrodoban roda a verificação na hora (só admins)', async () => {
+    w = await world();
+    w.wa.members = [
+      { jid: `${ADMIN}@s.whatsapp.net`, phone: ADMIN },
+      { jid: `${BRUNO}@s.whatsapp.net`, phone: BRUNO },
+    ];
+    w.now.value = at(9);
+    await w.send({ phone: ADMIN, at: '2026-11-09T15:00:00Z', text: '#carrodoban' });
+    expect(w.wa.last()).toContain('está desligado');
+    await w.send({ phone: ADMIN, at: '2026-11-09T15:01:00Z', text: '#ativarBAN' });
+    await w.send({ phone: ADMIN, at: '2026-11-09T15:02:00Z', text: '#carrodoban' });
+    expect(w.wa.last()).toContain('não achou ninguém');
+    await w.send({ phone: BRUNO, at: '2026-11-09T15:03:00Z', text: '#carro do ban' });
+    expect(w.wa.last()).toContain('Só os admins');
+
+    w.now.value = at(19); // quinta, 10 dias depois
+    await w.send({ phone: ADMIN, at: '2026-11-19T15:00:00Z', text: '#CarroDoBan' });
+    expect(w.wa.last()).toContain('Sumidos da semana');
+    expect(w.wa.last()).toContain('aviso 1 de 3');
+    // a rotina de segunda não repete o aviso dado há menos de 6 dias
+    w.now.value = at(23);
+    w.wa.clear();
+    await weeklyCheck(await ctxOf(w));
+    expect(w.wa.sent).toHaveLength(0);
+  });
+
+  it('não avisa ninguém se a lista do grupo vier vazia', async () => {
+    w = await world();
+    w.now.value = at(9);
+    await w.send({ phone: ADMIN, at: '2026-11-09T15:01:00Z', text: '#ativarBAN' });
+    await w.send({ phone: ADMIN, at: '2026-11-09T15:02:00Z', text: '#sumidos' });
+    expect(w.wa.last()).toContain('Não consegui ver quem está no grupo');
+    w.now.value = at(30);
+    w.wa.clear();
+    await weeklyCheck(await ctxOf(w));
+    expect(w.wa.sent).toHaveLength(0);
+  });
+});
+
 describe('#curiar', () => {
   it('admin liga e desliga o pedido de fotos', async () => {
     w = await world();
@@ -156,6 +248,41 @@ describe('#curiar', () => {
     Object.assign(w.wa, { sendTextMentions: async () => { throw new Error('boom'); } });
     await curiarJob(await ctxOf(w));
     expect(w.wa.last()).toBe('📸 Boa tarde! Foto agora!');
+  });
+});
+
+describe('#curiar com LID', () => {
+  it('troca o LID pelo telefone conhecido e, se a lista vier vazia, marca quem já falou no grupo', async () => {
+    w = await world();
+    // grupo novo: a AvisaAPI manda só o LID, e o "telefone" vira os dígitos do LID
+    w.wa.members = [
+      { jid: '111111111111111@lid', lid: '111111111111111@lid', phone: '111111111111111' },
+      { jid: '222222222222222@lid', lid: '222222222222222@lid', phone: '222222222222222' },
+      { jid: '333333333333333@lid', lid: '333333333333333@lid', phone: '333333333333333' },
+    ];
+    await w.sql`insert into wa_contacts (connection_id, lid, phone)
+      select id, '111111111111111@lid', ${ANA} from wa_connections union all
+      select id, '222222222222222@lid', ${BRUNO} from wa_connections`;
+    const mentioned: string[][] = [];
+    Object.assign(w.wa, {
+      sendTextMentions: async (chat: string, text: string, jids: string[]) => {
+        mentioned.push(jids);
+        w!.wa.sent.push({ chat, text });
+      },
+    });
+    w.runtime.invalidate();
+    await w.send({ phone: ADMIN, at: '2026-11-09T12:01:00Z', text: '#curiar' });
+    w.now.value = at(9, 15);
+    await curiarJob(await ctxOf(w));
+    // o terceiro LID não tem telefone conhecido: completa com quem já falou no grupo (o admin)
+    expect(mentioned.at(-1)).toEqual([`${ANA}@s.whatsapp.net`, `${BRUNO}@s.whatsapp.net`, `${ADMIN}@s.whatsapp.net`]);
+    expect(mentioned.at(-1)!.some((j) => j.startsWith('333'))).toBe(false);
+
+    // lista vazia: usa quem já falou no grupo
+    w.wa.members = [];
+    await w.send({ phone: CAIO, name: 'Caio', at: '2026-11-09T15:30:00Z', text: 'oi' });
+    await curiarJob(await ctxOf(w));
+    expect(mentioned.at(-1)).toEqual(expect.arrayContaining([`${ADMIN}@s.whatsapp.net`, `${CAIO}@s.whatsapp.net`]));
   });
 });
 
