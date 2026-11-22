@@ -1,6 +1,7 @@
 import type { BotContext, BotModule, GroupMember, InboundMessage } from '../../core/types.js';
 import { digits, last8, samePhone } from '../../core/phone.js';
 import { prettyPhone } from '../boasvindas/index.js';
+import { realPhones } from '../../core/members.js';
 import { adminOnly } from '../admins/index.js';
 import { setSetting, settings } from '../curiar/index.js';
 
@@ -61,7 +62,8 @@ async function toggle(ctx: BotContext, msg: InboundMessage, on: boolean): Promis
 }
 
 export function mentionText(m: GroupMember, name: string, canMention: boolean): string {
-  if (canMention) return `@${m.jid.split('@')[0]}${name ? ` (${name})` : ''}`;
+  // A AvisaAPI só marca pelo telefone (pelo LID não pega).
+  if (canMention) return `@${digits(m.phone)}${name ? ` (*${name}*)` : ''}`;
   return name ? `*${name}* (${prettyPhone(m.phone)})` : prettyPhone(m.phone);
 }
 
@@ -69,7 +71,10 @@ export function mentionText(m: GroupMember, name: string, canMention: boolean): 
 export async function weeklyCheck(ctx: BotContext): Promise<void> {
   const s = await settings(ctx);
   if (s.ban !== true) return;
-  const members = (await ctx.wa.listGroupMembers(ctx.bot.chatJid)).filter((m) => digits(m.phone).length >= 8);
+  // Telefone de verdade de cada um (quem vem só com LID tem o telefone buscado no que o bot já aprendeu).
+  const listed = await ctx.wa.listGroupMembers(ctx.bot.chatJid);
+  const phones = await realPhones(ctx, listed);
+  const members: GroupMember[] = listed.map((m, i) => ({ ...m, phone: phones[i]! })).filter((m) => m.phone.length >= 8);
   if (!members.length) return; // falha ao listar: não arrisca avisar ninguém
 
   const now = ctx.now();
@@ -112,7 +117,7 @@ export async function weeklyCheck(ctx: BotContext): Promise<void> {
   }
 
   const send = (text: string, list: GroupMember[]) =>
-    canMention && list.length ? ctx.wa.sendTextMentions!(ctx.bot.chatJid, text, list.map((m) => m.jid)) : ctx.reply(text);
+    canMention && list.length ? ctx.wa.sendTextMentions!(ctx.bot.chatJid, text, list.map((m) => `${digits(m.phone)}@s.whatsapp.net`)) : ctx.reply(text);
 
   if (warned.length) {
     await send(
