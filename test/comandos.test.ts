@@ -17,6 +17,17 @@ describe('comandos sem diferença de maiúsculas e acentos', () => {
     expect(normalizeCommand('Bom dia #Treino')).toBe('Bom dia #Treino');
   });
 
+  it('ignora caracteres invisíveis e símbolos parecidos antes do comando', () => {
+    expect(normalizeCommand('\u200E#Ranking')).toBe('#ranking');
+    expect(normalizeCommand('\uFEFF\u200B #quem vai pagar?')).toBe('#quem vai pagar?');
+    expect(normalizeCommand('\u00A0#Resumo ontem')).toBe('#resumo ontem');
+    expect(normalizeCommand('\uFF03ranking')).toBe('#ranking');
+    expect(normalizeCommand('#ran\u200Bking')).toBe('#ranking');
+    expect(normalizeCommand('\u200F\uFF1Ftapioca')).toBe('?tapioca');
+    // emoji composto (usa caractere invisível) continua igual
+    expect(normalizeCommand('\u{1F468}\u200D\u{1F469}\u200D\u{1F467} #treino')).toBe('\u{1F468}\u200D\u{1F469}\u200D\u{1F467} #treino');
+  });
+
   it('hashtags da legenda ignoram maiúsculas e acentos', () => {
     expect(hashtags('Hoje #Hidratação e #TREINO')).toEqual(['#hidratacao', '#treino']);
   });
@@ -36,5 +47,11 @@ describe('comandos sem diferença de maiúsculas e acentos', () => {
     expect(w.wa.last()).toContain('#treino');
     await w.send({ phone: ANA, at: '2026-11-09T10:03:00Z', image: { sha: 'x1', caption: 'bora #Treino' } });
     expect(w.wa.last()).toContain('localização');
+  });
+
+  it('responde comando com caractere invisível na frente', async () => {
+    w = await world();
+    await w.send({ phone: ANA, at: '2026-11-09T10:00:00Z', text: '\u200E#Ranking' });
+    expect(w.wa.last()).toContain('Ranking');
   });
 });

@@ -176,15 +176,29 @@ export class Runtime {
       conn.own_phone = digits(msg.senderPhone);
       await this.deps.sql`update wa_connections set own_phone = ${conn.own_phone} where id = ${conn.id}`;
     }
-    if (msg.fromMe && msg.type !== 'join' && !module.acceptsFromMe?.(msg)) return 'ignored';
+    const command = /^[#!?/\\]\S*/u.exec(normalizeCommand(msg.text))?.[0].slice(0, 40) ?? null;
+    if (msg.fromMe && msg.type !== 'join' && !module.acceptsFromMe?.(msg)) {
+      if (command) this.deps.log.info({ bot: row.name, command }, 'comando enviado pelo próprio número do bot: ignorado');
+      return 'ignored';
+    }
 
     const fresh = await this.deps.sql`
       insert into processed_messages (provider_msg_id, bot_id) values (${msg.id}, ${row.id})
       on conflict do nothing returning provider_msg_id`;
-    if (fresh.length === 0) return 'ignored';
+    if (fresh.length === 0) {
+      if (command) this.deps.log.info({ bot: row.name, command, messageId: msg.id }, 'mensagem repetida: ignorada');
+      return 'ignored';
+    }
 
     const bot = toBot(row);
+    // Para investigar comandos "ignorados": registra só a palavra do comando (sem o resto do texto)
+    // e quanto tempo ele esperou na fila do grupo e levou para rodar.
+    const queuedAt = Date.now();
+    if (command) this.deps.log.info({ bot: bot.name, chat: msg.chatJid, command, messageId: msg.id }, 'comando recebido');
     void this.queue.run(msg.chatJid, async () => {
+      const startedAt = Date.now();
+      const waitMs = startedAt - queuedAt;
+      if (waitMs > 15_000) this.deps.log.warn({ bot: bot.name, command, waitMs }, 'mensagem esperou muito na fila do grupo');
       try {
         if (!msg.senderPhone && msg.senderLid) msg.senderPhone = await contacts.phoneOf(msg.senderLid, msg.chatJid);
         if (msg.senderPhone && msg.pushName) {
@@ -201,7 +215,11 @@ export class Runtime {
         }
         await module.handle(ctx, msg);
       } catch (err) {
-        this.deps.log.error({ err: String(err), stack: (err as Error)?.stack, bot: bot.id, messageId: msg.id }, 'erro no módulo');
+        this.deps.log.error({ err: String(err), stack: (err as Error)?.stack, bot: bot.id, command, messageId: msg.id }, 'erro no módulo');
+      } finally {
+        const tookMs = Date.now() - startedAt;
+        if (command) this.deps.log.info({ bot: bot.name, command, waitMs, tookMs }, 'comando tratado');
+        else if (tookMs > 15_000) this.deps.log.warn({ bot: bot.name, type: msg.type, tookMs }, 'mensagem demorou para ser tratada');
       }
     });
     return 'handled';
