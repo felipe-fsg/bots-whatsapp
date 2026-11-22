@@ -160,6 +160,7 @@ export function helpText(): string {
     '🛡️ *Admins*',
     '• #agendar - responda à sugestão de evento (ou: #agendar Nome | 15/11 19h | Local)',
     '• #cancelarevento nome do evento',
+    '• #ativarlembretes / #desativarlembretes - liga ou desliga os lembretes da agenda (segunda às 9h; na semana do evento, todo dia às 9h, marcando todo mundo)',
     '• #mascote Nome do personagem - troca o mascote (#mascote padrão volta ao Mestre Splinter)',
     '• #boasvindas - mostra ou troca a mensagem para quem entra no grupo',
     '• #promover @pessoa / #demover @pessoa - dá ou tira a função de admin do bot (#admins lista)',
