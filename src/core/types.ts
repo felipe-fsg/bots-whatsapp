@@ -61,6 +61,8 @@ export interface GroupMember {
   phone: string;
   /** Admin do grupo no WhatsApp (não confundir com admin do bot). */
   admin?: boolean;
+  /** Nome que o WhatsApp mostra (quando a lista do grupo traz). */
+  name?: string;
 }
 
 export interface WhatsAppProvider extends WhatsAppSender {

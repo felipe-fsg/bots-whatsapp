@@ -23,10 +23,13 @@ interface Row {
 /** Anota que a pessoa falou no grupo e zera os avisos dela. */
 async function seen(ctx: BotContext, msg: InboundMessage): Promise<void> {
   const phone = digits(msg.senderPhone);
-  if (phone.length < 8) return;
+  const lid = msg.senderLid?.endsWith('@lid') ? digits(msg.senderLid) : '';
+  // Sem telefone conhecido, anota pelo LID: assim quem fala nunca é tratado como sumido.
+  const key = phone.length >= 8 && phone !== lid ? last8(phone) : lid.length >= 8 ? `lid:${lid}` : '';
+  if (!key) return;
   await ctx.sql`
     insert into member_activity (bot_id, member_key, phone, tracked_since, last_seen_at)
-    values (${ctx.bot.id}, ${last8(phone)}, ${phone}, ${msg.timestamp}, ${msg.timestamp})
+    values (${ctx.bot.id}, ${key}, ${key.startsWith('lid:') ? '' : phone}, ${msg.timestamp}, ${msg.timestamp})
     on conflict (bot_id, member_key) do update set
       phone = excluded.phone, warnings = 0,
       last_seen_at = greatest(member_activity.last_seen_at, excluded.last_seen_at)`;
@@ -138,16 +141,23 @@ async function findInactive(ctx: BotContext, members: Member[], since: Date, now
     const lastActive = Math.max((r.last_seen_at ?? r.tracked_since).getTime(), since.getTime());
     if (now.getTime() - lastActive < INACTIVE_DAYS * DAY) continue;
     if (r.last_warned_at && now.getTime() - r.last_warned_at.getTime() < 6 * DAY) continue; // já avisado nesta semana
+    const days = Math.floor((now.getTime() - (r.last_seen_at ?? r.tracked_since).getTime()) / DAY);
     if (m.hidden) {
-      // nunca falou e o WhatsApp esconde o número: não dá para marcar nem saber quem é
+      // o WhatsApp esconde o número: não dá para marcar, então vai pelo nome (se a lista trouxer)
       hidden++;
+      list.push({ m, r, label: hiddenLabel(m), days });
       continue;
     }
-    const name = await ctx.nameOf(m.phone);
-    const days = Math.floor((now.getTime() - (r.last_seen_at ?? r.tracked_since).getTime()) / DAY);
+    const name = (await ctx.nameOf(m.phone)) || m.name || '';
     list.push({ m, r, label: mentionText(m, name, canMention), days });
   }
   return { list, hidden, canMention };
+}
+
+/** Como mostrar quem só tem LID: pelo nome do WhatsApp, ou pelo final do código. */
+export function hiddenLabel(m: GroupMember): string {
+  const tag = `final ${digits(m.lid ?? m.jid).slice(-4)}`;
+  return m.name ? `*${m.name}* (número escondido pelo WhatsApp, ${tag})` : `alguém com o número escondido pelo WhatsApp (${tag})`;
 }
 
 /** Toda semana: avisa quem está sumido e tira do grupo quem já levou os 3 avisos. */
@@ -182,8 +192,8 @@ export async function weeklyCheck(ctx: BotContext): Promise<CheckResult> {
     'sumidos da semana',
   );
 
-  const warned: { m: GroupMember; line: string }[] = [];
-  const out: { m: GroupMember; label: string }[] = [];
+  const warned: { m: Member; line: string }[] = [];
+  const out: { m: Member; label: string }[] = [];
   for (const { m, r, label, days } of list) {
     if (r.warnings >= MAX_WARNINGS) {
       out.push({ m, label });
@@ -195,8 +205,11 @@ export async function weeklyCheck(ctx: BotContext): Promise<CheckResult> {
     warned.push({ m, line: `• ${label}: ${when} (aviso ${n} de ${MAX_WARNINGS}${n === MAX_WARNINGS ? ', último' : ''})` });
   }
 
-  const send = (text: string, list: GroupMember[]) =>
-    canMention && list.length ? ctx.wa.sendTextMentions!(ctx.bot.chatJid, text, list.map((m) => `${digits(m.phone)}@s.whatsapp.net`)) : ctx.reply(text);
+  // só dá para marcar quem tem telefone; quem só tem LID aparece pelo nome
+  const send = (text: string, list: Member[]) => {
+    const jids = list.filter((m) => !m.hidden).map((m) => `${digits(m.phone)}@s.whatsapp.net`);
+    return canMention && jids.length ? ctx.wa.sendTextMentions!(ctx.bot.chatJid, text, jids) : ctx.reply(text);
+  };
 
   if (warned.length) {
     await send(
@@ -213,12 +226,12 @@ export async function weeklyCheck(ctx: BotContext): Promise<CheckResult> {
   }
 
   const removed: string[] = [];
-  const manual: { m: GroupMember; label: string }[] = [];
+  const manual: { m: Member; label: string }[] = [];
   for (const o of out) {
     try {
       if (!ctx.wa.removeParticipant) throw new Error('provedor não remove participantes');
       await ctx.wa.removeParticipant(ctx.bot.chatJid, o.m.jid);
-      await ctx.sql`delete from member_activity where bot_id = ${ctx.bot.id} and member_key = ${last8(o.m.phone)}`;
+      await ctx.sql`delete from member_activity where bot_id = ${ctx.bot.id} and member_key = ${o.m.key}`;
       removed.push(o.label);
     } catch (err) {
       ctx.log.warn({ err: String(err) }, 'não consegui remover membro inativo');
@@ -228,7 +241,9 @@ export async function weeklyCheck(ctx: BotContext): Promise<CheckResult> {
   if (removed.length) await ctx.reply(`🚪 Saíram do grupo depois de ${MAX_WARNINGS} avisos sem interagir:\n${removed.map((r) => `• ${r}`).join('\n')}`);
   if (manual.length) {
     await send(
-      `🛡️ Admins: ${manual.length > 1 ? 'estas pessoas completaram' : 'esta pessoa completou'} ${MAX_WARNINGS} avisos sem interagir e ${manual.length > 1 ? 'devem' : 'deve'} sair do grupo. Não consegui remover sozinho (o número do bot precisa ser admin do grupo), então removam, por favor:\n${manual.map((o) => `• ${o.label}`).join('\n')}`,
+      `🛡️ Admins: ${manual.length > 1 ? 'estas pessoas completaram' : 'esta pessoa completou'} ${MAX_WARNINGS} avisos sem interagir e ${manual.length > 1 ? 'devem' : 'deve'} sair do grupo. Não consegui remover sozinho (o número do bot precisa ser admin do grupo), então removam, por favor:\n${manual.map((o) => `• ${o.label}`).join('\n')}${
+        manual.some((o) => o.m.hidden) ? '\n\nQuem está com o número escondido não dá para marcar: procurem pelo nome nos dados do grupo.' : ''
+      }`,
       manual.map((o) => o.m),
     );
   }
@@ -268,7 +283,7 @@ async function preview(ctx: BotContext, msg: InboundMessage): Promise<void> {
   await track(ctx, members, now);
   const { list, hidden } = await findInactive(ctx, members, since, now);
   const noPhone = members.filter((m) => m.hidden).length;
-  lines.push(`Vejo ${members.length} pessoas no grupo${noPhone ? ` (${noPhone} nunca falaram e o WhatsApp esconde o número delas, então não consigo marcar nem avisar)` : ''}.`);
+  lines.push(`Vejo ${members.length} pessoas no grupo${noPhone ? ` (${noPhone} com o número escondido pelo WhatsApp: aparecem pelo nome, sem marcar)` : ''}.`);
   if (!on) return ctx.reply(lines.join('\n'));
   lines.push('');
   if (!list.length) lines.push(`Hoje ninguém seria avisado (ninguém com mais de ${INACTIVE_DAYS} dias sem falar desde que liguei).`);
@@ -279,7 +294,7 @@ async function preview(ctx: BotContext, msg: InboundMessage): Promise<void> {
       lines.push(`• ${c.label}: ${when}, ${c.r.warnings} de ${MAX_WARNINGS} avisos${c.r.warnings >= MAX_WARNINGS ? ' (sairia do grupo)' : ''}`);
     }
   }
-  if (hidden) lines.push('', `Mais ${hidden} sem número conhecido também estão sumidos, mas não dá para marcar.`);
+  if (hidden) lines.push('', 'Quem está com o número escondido pelo WhatsApp aparece pelo nome, sem marcar. Se eu não conseguir remover, peço para os admins.');
   // mostra os nomes sem marcar ninguém
   await ctx.reply(lines.join('\n').replace(/@(\d{8,})/g, (_, p: string) => prettyPhone(p)));
 }
@@ -289,8 +304,9 @@ export const inativos: BotModule = {
   id: 'inativos',
   jobs: [{ name: 'sumidos-da-semana', cron: '0 12 * * 1', run: async (ctx) => void (await weeklyCheck(ctx)) }],
   async handle(ctx, msg) {
-    if (msg.type === 'join' || !msg.senderPhone) return false;
+    if (msg.type === 'join') return false;
     await seen(ctx, msg);
+    if (!msg.senderPhone) return false;
     if (msg.type !== 'text') return false;
     if (/^[#!]carro\s*do\s*ban(?![\p{L}\p{N}])/iu.test(msg.text.trim())) {
       await runNow(ctx, msg);

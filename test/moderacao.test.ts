@@ -124,7 +124,7 @@ describe('aviso de sumidos em grupo que só manda LID', () => {
     await w.send({ phone: ADMIN, at: '2026-11-10T15:00:00Z', text: '#sumidos' });
     expect(w.wa.last()).toContain('Ligado desde 09/11');
     expect(w.wa.last()).toContain('Hoje ninguém seria avisado');
-    expect(w.wa.last()).toContain('1 nunca falaram');
+    expect(w.wa.last()).toContain('1 com o número escondido');
 
     // Ana fala todo dia; Bruno sumiu
     for (const d of [12, 14, 15]) await w.send({ phone: ANA, name: 'Ana', at: `2026-11-${d}T12:00:00Z`, text: 'oi' });
@@ -133,10 +133,10 @@ describe('aviso de sumidos em grupo que só manda LID', () => {
     w.now.value = at(16, 13);
     w.wa.clear();
     await w.send({ phone: ADMIN, at: '2026-11-16T16:00:00Z', text: '#sumidos' });
-    expect(w.wa.last()).toContain('esta pessoa seria avisada');
+    expect(w.wa.last()).toContain('estas 2 pessoas seriam avisadas');
     expect(w.wa.last()).toContain('*Bruno* (+55 11 92222-2222): 7 dias sem interagir, 0 de 3 avisos');
+    expect(w.wa.last()).toContain('alguém com o número escondido pelo WhatsApp (final 3333): nunca falou');
     expect(w.wa.last()).not.toContain('Ana');
-    expect(w.wa.last()).toContain('Mais 1 sem número conhecido');
 
     w.now.value = at(16);
     w.wa.clear();
@@ -145,6 +145,7 @@ describe('aviso de sumidos em grupo que só manda LID', () => {
     expect(w.wa.last()).toContain('Bruno');
     expect(w.wa.last()).toContain('aviso 1 de 3');
     expect(w.wa.last()).not.toContain('Ana');
+    expect(w.wa.last()).toContain('alguém com o número escondido pelo WhatsApp (final 3333)');
     expect(w.wa.last()).not.toContain('3333333');
 
     // na semana seguinte Ana continua contando (o registro dela não foi apagado)
@@ -180,6 +181,39 @@ describe('aviso de sumidos em grupo que só manda LID', () => {
     w.wa.clear();
     await weeklyCheck(await ctxOf(w));
     expect(w.wa.sent).toHaveLength(0);
+  });
+
+  it('quem só tem LID: avisa pelo nome, conta mensagem pelo LID e remove pelo LID', async () => {
+    w = await world();
+    const LID_ZE = '444444444444444@lid';
+    const LID_LIA = '555555555555555@lid';
+    w.wa.members = [
+      { jid: `${ADMIN}@s.whatsapp.net`, phone: ADMIN },
+      { jid: LID_ZE, lid: LID_ZE, phone: '444444444444444', name: 'Zé' },
+      { jid: LID_LIA, lid: LID_LIA, phone: '555555555555555', name: 'Lia' },
+    ];
+    const removed: string[] = [];
+    Object.assign(w.wa, { removeParticipant: async (_c: string, jid: string) => void removed.push(jid) });
+    w.now.value = at(9);
+    await w.send({ phone: ADMIN, at: '2026-11-09T15:01:00Z', text: '#ativarBAN' });
+
+    // Lia fala, mas a mensagem chega só com o LID (sem telefone)
+    for (const d of [12, 19, 26])
+      await w.send({ phone: '', lid: LID_LIA, name: 'Lia', at: `2026-11-${d}T12:00:00Z`, text: 'oi' });
+
+    for (const [day, n] of [[16, 1], [23, 2], [30, 3]] as const) {
+      w.now.value = at(day);
+      w.wa.clear();
+      await weeklyCheck(await ctxOf(w));
+      expect(w.wa.last()).toContain(`*Zé* (número escondido pelo WhatsApp, final 4444): nenhuma mensagem desde que comecei a acompanhar (aviso ${n} de 3`);
+      expect(w.wa.last()).not.toContain('Lia');
+    }
+    w.now.value = new Date('2026-12-07T15:00:00Z');
+    w.wa.clear();
+    await weeklyCheck(await ctxOf(w));
+    expect(removed).toEqual([LID_ZE]);
+    expect(w.wa.last()).toContain('Saíram do grupo');
+    expect(w.wa.last()).toContain('*Zé*');
   });
 
   it('não avisa ninguém se a lista do grupo vier vazia', async () => {
