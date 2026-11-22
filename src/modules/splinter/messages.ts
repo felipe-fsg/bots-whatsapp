@@ -167,6 +167,7 @@ export function helpText(): string {
     '• #ban - respondendo à mensagem de alguém, tira a pessoa do grupo',
     '• #fechargrupo / #abrirgrupo - só admins mandam mensagens / libera para todos',
     '• #ativarBAN / #desativarBAN - aviso semanal de quem está sumido há 7 dias (sai do grupo depois do 3º aviso)',
+    '• #sumidos - (admins) mostra quem seria avisado agora, sem avisar ninguém',
     '• #curiar / #nãocuriar - liga ou desliga o pedido de fotos às 10h, 15h e 21h',
     '• #ativar / #desativar + atividade - liga ou desliga uma atividade do desafio. Ex.: #desativar pose, #ativar cardio, #desativar resumo',
     '• #pausar / #despausar - pausa a competição (fotos não valem ponto) e retoma',
