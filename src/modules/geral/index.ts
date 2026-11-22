@@ -20,6 +20,8 @@ export function helpText(mascot: string): string {
     '• #engajamento - ranking de quem mais manda mensagens no grupo',
     '• #quem + pergunta - sorteia alguém do grupo. Ex.: #quem vai mandar um ifood pra mim?',
     '• #tarot + pergunta (opcional) - o mascote tira 3 cartas e lê a sua sorte (1 por dia). Ex.: #tarot vou passar no concurso?',
+    '• #nascimento + data - registra seu aniversário para ganhar parabéns no dia (ano opcional). Ex.: #nascimento 15/03 (#aniversariantes mostra os do mês)',
+    '• #horoscopo - o horóscopo do dia do seu signo (1 por dia). Ou de outro signo: #horoscopo leão',
     `• Para conversar com o mascote, comece a mensagem com "${mascot.split(' ').pop()}"`,
     '',
     '🛡️ *Admins*',
