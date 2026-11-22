@@ -156,6 +156,32 @@ describe('aviso de sumidos em grupo que só manda LID', () => {
     expect(w.wa.last()).not.toContain('Ana');
   });
 
+  it('#carrodoban roda a verificação na hora (só admins)', async () => {
+    w = await world();
+    w.wa.members = [
+      { jid: `${ADMIN}@s.whatsapp.net`, phone: ADMIN },
+      { jid: `${BRUNO}@s.whatsapp.net`, phone: BRUNO },
+    ];
+    w.now.value = at(9);
+    await w.send({ phone: ADMIN, at: '2026-11-09T15:00:00Z', text: '#carrodoban' });
+    expect(w.wa.last()).toContain('está desligado');
+    await w.send({ phone: ADMIN, at: '2026-11-09T15:01:00Z', text: '#ativarBAN' });
+    await w.send({ phone: ADMIN, at: '2026-11-09T15:02:00Z', text: '#carrodoban' });
+    expect(w.wa.last()).toContain('não achou ninguém');
+    await w.send({ phone: BRUNO, at: '2026-11-09T15:03:00Z', text: '#carro do ban' });
+    expect(w.wa.last()).toContain('Só os admins');
+
+    w.now.value = at(19); // quinta, 10 dias depois
+    await w.send({ phone: ADMIN, at: '2026-11-19T15:00:00Z', text: '#CarroDoBan' });
+    expect(w.wa.last()).toContain('Sumidos da semana');
+    expect(w.wa.last()).toContain('aviso 1 de 3');
+    // a rotina de segunda não repete o aviso dado há menos de 6 dias
+    w.now.value = at(23);
+    w.wa.clear();
+    await weeklyCheck(await ctxOf(w));
+    expect(w.wa.sent).toHaveLength(0);
+  });
+
   it('não avisa ninguém se a lista do grupo vier vazia', async () => {
     w = await world();
     w.now.value = at(9);

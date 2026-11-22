@@ -33,6 +33,7 @@ export function helpText(mascot: string): string {
     '• #fechargrupo / #abrirgrupo - só admins mandam mensagens / libera para todos',
     '• #ativarBAN / #desativarBAN - aviso semanal de quem está sumido há 7 dias (sai do grupo depois do 3º aviso)',
     '• #sumidos - (admins) mostra quem seria avisado agora, sem avisar ninguém',
+    '• #carrodoban - (admins) roda agora a verificação de sumidos e aplica os avisos (e remoções)',
     '• #curiar / #nãocuriar - liga ou desliga o pedido de fotos às 10h, 15h e 21h',
   ].join('\n');
 }

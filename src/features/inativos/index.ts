@@ -151,14 +151,22 @@ async function findInactive(ctx: BotContext, members: Member[], since: Date, now
 }
 
 /** Toda semana: avisa quem está sumido e tira do grupo quem já levou os 3 avisos. */
-export async function weeklyCheck(ctx: BotContext): Promise<void> {
+export interface CheckResult {
+  /** Por que não rodou (desligado ou sem lista do grupo). */
+  skipped?: string;
+  warned: number;
+  removed: number;
+  manual: number;
+}
+
+export async function weeklyCheck(ctx: BotContext): Promise<CheckResult> {
   const s = await settings(ctx);
-  if (s.ban !== true) return;
+  if (s.ban !== true) return { skipped: 'desligado', warned: 0, removed: 0, manual: 0 };
   const { members, error } = await resolveMembers(ctx);
   if (error) {
     // falha ao listar: não arrisca avisar ninguém
     ctx.log.warn({ chat: ctx.bot.chatJid, error }, 'sumidos da semana: não rodou');
-    return;
+    return { skipped: error, warned: 0, removed: 0, manual: 0 };
   }
 
   const now = ctx.now();
@@ -224,6 +232,19 @@ export async function weeklyCheck(ctx: BotContext): Promise<void> {
       manual.map((o) => o.m),
     );
   }
+  return { warned: warned.length, removed: removed.length, manual: manual.length };
+}
+
+/** #carrodoban (admins): roda agora a verificação de segunda, avisando e removendo de verdade. */
+async function runNow(ctx: BotContext, msg: InboundMessage): Promise<void> {
+  if (!(await ctx.isAdmin(msg.senderPhone))) return ctx.reply(adminOnly('chamar o carro do ban'));
+  const r = await weeklyCheck(ctx);
+  if (r.skipped === 'desligado') return ctx.reply('🚓 O aviso de sumidos está desligado. Ligue com #ativarBAN e depois chame o #carrodoban.');
+  if (r.skipped) return ctx.reply(`🚓 Não consegui rodar: ${r.skipped}. Sem a lista do grupo eu não aviso ninguém.`);
+  if (!r.warned && !r.removed && !r.manual)
+    return ctx.reply(
+      `🚓 Carro do ban passou e não achou ninguém: ninguém está há mais de ${INACTIVE_DAYS} dias sem falar (ou já foi avisado nos últimos 6 dias). Veja a situação com #sumidos.`,
+    );
 }
 
 /** #sumidos (admins): mostra como está o aviso e quem seria avisado agora, sem avisar ninguém. */
@@ -266,11 +287,15 @@ async function preview(ctx: BotContext, msg: InboundMessage): Promise<void> {
 /** Aviso de sumidos: #ativarBAN / #desativarBAN. Função do núcleo. Também anota quem fala no grupo. */
 export const inativos: BotModule = {
   id: 'inativos',
-  jobs: [{ name: 'sumidos-da-semana', cron: '0 12 * * 1', run: weeklyCheck }],
+  jobs: [{ name: 'sumidos-da-semana', cron: '0 12 * * 1', run: async (ctx) => void (await weeklyCheck(ctx)) }],
   async handle(ctx, msg) {
     if (msg.type === 'join' || !msg.senderPhone) return false;
     await seen(ctx, msg);
     if (msg.type !== 'text') return false;
+    if (/^[#!]carro\s*do\s*ban(?![\p{L}\p{N}])/iu.test(msg.text.trim())) {
+      await runNow(ctx, msg);
+      return true;
+    }
     if (/^[#!]sumidos(?![\p{L}\p{N}])/iu.test(msg.text.trim())) {
       await preview(ctx, msg);
       return true;
