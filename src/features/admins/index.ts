@@ -54,7 +54,9 @@ async function demote(ctx: BotContext, msg: InboundMessage, rest: string): Promi
 async function list(ctx: BotContext): Promise<void> {
   const admins = await ctx.sql<{ phone: string; name: string | null }[]>`select phone, name from bot_admins where bot_id = ${ctx.bot.id} order by name`;
   const names = await Promise.all(admins.map(async (a) => (await ctx.nameOf(a.phone)) || a.name || prettyPhone(a.phone)));
-  await ctx.reply(`🛡️ *Admins do bot*\n${names.map((n) => `• ${n}`).join('\n') || '• ninguém'}`);
+  await ctx.reply(
+    `🛡️ *Admins do bot*\n${names.map((n) => `• ${n}`).join('\n') || '• ninguém'}\n\nOs admins do grupo no WhatsApp também são admins do bot.`,
+  );
 }
 
 /** #ban respondendo à mensagem de alguém: tira a pessoa do grupo. */
