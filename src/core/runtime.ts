@@ -5,6 +5,7 @@ import { KeyedQueue } from './queue.js';
 import { digits, last8, samePhone } from './phone.js';
 import { normalizeCommand } from './commands.js';
 import { AvisaClient } from './whatsapp/avisa.js';
+import { isOwner, parseAtivacao, runAtivacao, type AtivacaoCommand } from './ativacao.js';
 
 interface ConnectionRow {
   id: string;
@@ -14,6 +15,7 @@ interface ConnectionRow {
   forward_url: string | null;
   forward_chats: string[];
   own_phone: string | null;
+  label: string;
 }
 
 interface BotRow {
@@ -71,7 +73,7 @@ export class Runtime {
   private async load() {
     if (this.cache && Date.now() - this.cache.at < 30_000) return this.cache;
     const conns = await this.deps.sql<ConnectionRow[]>`
-      select id, provider, base_url, token_env, forward_url, forward_chats, own_phone from wa_connections`;
+      select id, label, provider, base_url, token_env, forward_url, forward_chats, own_phone from wa_connections`;
     const bots = await this.deps.sql<BotRow[]>`
       select id, tenant_id, connection_id, name, module, chat_jid, settings from bots where active`;
     this.cache = { at: Date.now(), bots, conns: new Map(conns.map((c) => [c.id, c])) };
@@ -153,6 +155,12 @@ export class Runtime {
     await contacts.learn(msg.senderLid, msg.senderPhone).catch(() => {});
 
     const row = bots.find((b) => b.connection_id === connectionId && b.chat_jid === msg.chatJid);
+    // #ativarbot / #desativarbot do dono: vale em qualquer grupo, com ou sem bot cadastrado
+    const ativacao = msg.type === 'text' ? parseAtivacao(normalizeCommand(msg.text.trim())) : null;
+    if (ativacao) {
+      const done = await this.ativacao(conn, contacts, row, msg, ativacao);
+      if (done) return done;
+    }
     if (msg.type === 'join') this.deps.log.info({ chat: msg.chatJid, joined: msg.joined?.length ?? 0, bot: row?.name ?? null }, 'entrada no grupo');
     if (!row) {
       const wanted = conn.forward_chats.length === 0 || conn.forward_chats.includes(msg.chatJid);
@@ -202,6 +210,33 @@ export class Runtime {
         await module.handle(ctx, msg);
       } catch (err) {
         this.deps.log.error({ err: String(err), stack: (err as Error)?.stack, bot: bot.id, messageId: msg.id }, 'erro no módulo');
+      }
+    });
+    return 'handled';
+  }
+
+  /** Liga/desliga o bot no grupo. Devolve null se quem mandou não é o dono (a mensagem segue o caminho normal). */
+  private async ativacao(
+    conn: ConnectionRow,
+    contacts: Contacts,
+    row: BotRow | undefined,
+    msg: InboundMessage,
+    cmd: AtivacaoCommand,
+  ): Promise<'handled' | 'ignored' | null> {
+    let phone = msg.senderPhone;
+    if (!phone && msg.senderLid) phone = await contacts.phoneOf(msg.senderLid, msg.chatJid).catch(() => '');
+    if (!isOwner(msg, phone, this.deps.env ?? process.env)) return null;
+    const fresh = await this.deps.sql`
+      insert into processed_messages (provider_msg_id, bot_id) values (${msg.id}, ${row?.id ?? null})
+      on conflict do nothing returning provider_msg_id`;
+    if (fresh.length === 0) return 'ignored';
+    const wa = this.provider(conn);
+    void this.queue.run(msg.chatJid, async () => {
+      try {
+        const deps = { sql: this.deps.sql, wa, log: this.deps.log, connectionId: conn.id, connectionLabel: conn.label, senderPhone: phone, senderName: msg.pushName };
+        if (await runAtivacao(deps, msg, cmd)) this.invalidate();
+      } catch (err) {
+        this.deps.log.error({ err: String(err), stack: (err as Error)?.stack, chat: msg.chatJid }, 'erro no #ativarbot');
       }
     });
     return 'handled';

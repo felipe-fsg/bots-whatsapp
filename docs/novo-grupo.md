@@ -2,6 +2,23 @@
 
 O mesmo número de WhatsApp atende vários grupos. O webhook da AvisaAPI não muda.
 
+## Jeito rápido: comando no grupo
+
+Com o número do bot no grupo, mande **do próprio número do bot** (ou de um telefone listado em
+`BOT_DONOS` no `.env`):
+
+- `#ativarbot social` (ou `#habilitarbot social`): grupo de conversa (módulo `geral`)
+- `#ativarbot fitness`: desafio fitness (módulo `splinter`)
+- `#ativarbot duvidas tecnicas`: grupo de trabalho (módulo `tecnico`)
+- `#desativarbot`: desliga o bot no grupo (os dados ficam guardados)
+
+O bot responde na hora. Viram admins do bot quem mandou o comando e os admins do grupo no WhatsApp
+(quando a AvisaAPI mostra o telefone deles). Mandar outro tipo troca o módulo do grupo.
+No fitness, as fotos só valem pontos depois de cadastrar o desafio pelo arquivo JSON (passos abaixo).
+Quem não é dono e manda o comando é ignorado.
+
+## Jeito completo: arquivo JSON
+
 1. Adicione o número do bot ao grupo (pelo WhatsApp, como qualquer participante).
 2. No servidor, descubra o código do grupo:
    ```bash
@@ -19,3 +36,4 @@ Tipos de bot (`modulo`):
 |---|---|---|
 | `geral` | grupo de conversa, amigos, rolês | #resumo, #agenda, #mascote, #motivação, ?pesquisa, #ajuda |
 | `splinter` | desafio fitness | tudo do geral + check-ins, ranking, equipes, ?alimento |
+| `tecnico` | grupo de trabalho (dúvidas técnicas) | /duvida com a base técnica, revisão dos sêniores, #resumo, #agenda |
