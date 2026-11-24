@@ -1,11 +1,11 @@
 import type { Sql } from '../db.js';
-import type { AiClient, Bot, BotContext, BotModule, InboundMessage, Logger, PlacesClient, WhatsAppProvider } from './types.js';
+import type { AiClient, Bot, BotContext, BotModule, GroupMember, InboundMessage, Logger, PlacesClient, WhatsAppProvider } from './types.js';
 import { Contacts } from './contacts.js';
 import { KeyedQueue } from './queue.js';
 import { digits, last8, samePhone } from './phone.js';
 import { normalizeCommand } from './commands.js';
 import { AvisaClient } from './whatsapp/avisa.js';
-import { isOwner, parseAtivacao, runAtivacao, type AtivacaoCommand } from './ativacao.js';
+import { isOwner, ownerPhones, parseAtivacao, runAtivacao, type AtivacaoCommand } from './ativacao.js';
 
 interface ConnectionRow {
   id: string;
@@ -93,9 +93,79 @@ export class Runtime {
         if (!token) throw new Error(`Variável ${conn.token_env} (token da AvisaAPI) não definida`);
         p = new AvisaClient(conn.base_url, token, this.deps.fetchFn);
       }
+      p = this.recordingSends(p);
       this.providers.set(conn.id, p);
     }
     return p;
+  }
+
+  /** Telefones dos admins do grupo no WhatsApp (guardados por 10 min; 1 min se a AvisaAPI falhar). */
+  private readonly groupAdminCache = new Map<string, { at: number; ttl: number; phones: Promise<string[]> }>();
+
+  groupAdmins(connectionId: string, chatJid: string, wa: WhatsAppProvider): Promise<string[]> {
+    const key = `${connectionId}|${chatJid}`;
+    const hit = this.groupAdminCache.get(key);
+    if (hit && Date.now() - hit.at < hit.ttl) return hit.phones;
+    const entry = { at: Date.now(), ttl: 10 * 60_000, phones: Promise.resolve<string[]>([]) };
+    entry.phones = (async () => {
+      try {
+        const admins = (await wa.listGroupMembers(chatJid)).filter((m) => m.admin);
+        const lidOf = (m: GroupMember) => m.lid ?? (m.jid.endsWith('@lid') ? m.jid : '');
+        const out: string[] = [];
+        const lids: string[] = [];
+        for (const m of admins) {
+          const lid = lidOf(m);
+          if (digits(m.phone).length >= 8 && !(lid && digits(lid) === digits(m.phone))) out.push(digits(m.phone));
+          else if (lid) lids.push(lid);
+        }
+        if (lids.length) {
+          // admin com número escondido (só LID): usa o telefone que o bot já aprendeu dele
+          const rows = await this.deps.sql<{ phone: string }[]>`
+            select phone from wa_contacts where connection_id = ${connectionId} and lid = any(${lids}::text[])`;
+          out.push(...rows.map((r) => digits(r.phone)));
+        }
+        return out;
+      } catch (err) {
+        entry.ttl = 60_000;
+        this.deps.log.warn({ err: String(err), chat: chatJid }, 'não consegui listar os admins do grupo');
+        return [];
+      }
+    })();
+    this.groupAdminCache.set(key, entry);
+    return entry.phones;
+  }
+
+  /** O que o bot mandou nos últimos minutos, por grupo: a AvisaAPI devolve essas mensagens como "fromMe". */
+  private readonly sentByBot = new Map<string, { text: string; at: number }[]>();
+
+  private recordingSends(p: WhatsAppProvider): WhatsAppProvider {
+    const remember = (chat: string, text: string) => {
+      const now = Date.now();
+      const list = (this.sentByBot.get(chat) ?? []).filter((e) => now - e.at < 10 * 60_000).slice(-50);
+      list.push({ text: text.trim(), at: now });
+      this.sentByBot.set(chat, list);
+    };
+    return new Proxy(p, {
+      get(target, prop, receiver) {
+        const value = Reflect.get(target, prop, receiver);
+        if (typeof value !== 'function') return value;
+        if (prop === 'sendText' || prop === 'sendTextWithId' || prop === 'sendTextMentions') {
+          return (chat: string, text: string, ...rest: unknown[]) => {
+            remember(chat, text);
+            return (value as (...a: unknown[]) => unknown).call(target, chat, text, ...rest);
+          };
+        }
+        return value.bind(target);
+      },
+    });
+  }
+
+  /** Mensagem do próprio número do bot digitada por uma pessoa (comando), e não uma resposta do bot. */
+  private typedOnBotNumber(msg: InboundMessage): boolean {
+    if (msg.type !== 'text' && msg.type !== 'image') return false;
+    const text = msg.text.trim();
+    if (!/^[#!?/\\]/.test(text)) return false;
+    return !(this.sentByBot.get(msg.chatJid) ?? []).some((e) => e.text === text);
   }
 
   async connectionExists(connectionId: string): Promise<boolean> {
@@ -140,8 +210,13 @@ export class Runtime {
         return rows[0]?.push_name ?? '';
       },
       isAdmin: async (phone) => {
+        // o próprio número do bot e os donos (BOT_DONOS) são admins em todos os grupos
+        if (conn.own_phone && samePhone(conn.own_phone, phone)) return true;
+        if (ownerPhones(this.deps.env ?? process.env).some((o) => samePhone(o, phone))) return true;
         const admins = await sql<{ phone: string }[]>`select phone from bot_admins where bot_id = ${bot.id}`;
-        return admins.some((a) => samePhone(a.phone, phone));
+        if (admins.some((a) => samePhone(a.phone, phone))) return true;
+        // admins do grupo no WhatsApp também são admins do bot
+        return (await this.groupAdmins(conn.id, bot.chatJid, wa)).some((p) => samePhone(p, phone));
       },
     };
   }
@@ -188,7 +263,8 @@ export class Runtime {
       conn.own_phone = digits(msg.senderPhone);
       await this.deps.sql`update wa_connections set own_phone = ${conn.own_phone} where id = ${conn.id}`;
     }
-    if (msg.fromMe && msg.type !== 'join' && !module.acceptsFromMe?.(msg)) return 'ignored';
+    if (msg.fromMe && msg.type !== 'join' && !module.acceptsFromMe?.(msg) && !this.typedOnBotNumber(msg)) return 'ignored';
+    if (msg.fromMe && !msg.senderPhone && conn.own_phone) msg.senderPhone = conn.own_phone;
 
     const fresh = await this.deps.sql`
       insert into processed_messages (provider_msg_id, bot_id) values (${msg.id}, ${row.id})
@@ -230,6 +306,10 @@ export class Runtime {
     let phone = msg.senderPhone;
     if (!phone && msg.senderLid) phone = await contacts.phoneOf(msg.senderLid, msg.chatJid).catch(() => '');
     if (!isOwner(msg, phone, this.deps.env ?? process.env)) return null;
+    if (msg.fromMe && phone && !conn.own_phone) {
+      conn.own_phone = digits(phone);
+      await this.deps.sql`update wa_connections set own_phone = ${conn.own_phone} where id = ${conn.id}`;
+    }
     const fresh = await this.deps.sql`
       insert into processed_messages (provider_msg_id, bot_id) values (${msg.id}, ${row?.id ?? null})
       on conflict do nothing returning provider_msg_id`;

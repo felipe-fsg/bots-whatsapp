@@ -117,7 +117,7 @@ export async function runAtivacao(d: Deps, msg: InboundMessage, cmd: AtivacaoCom
 
   const changed = existing && existing.module !== type ? ` (antes era *${BOT_TYPES[existing.module as BotType]?.label ?? existing.module}*)` : '';
   const lines = [`✅ Bot ligado neste grupo como *${BOT_TYPES[type].label}*${changed}.`];
-  lines.push(admins.length ? `Admins do bot: ${admins.join(', ')}.` : 'Ainda não há admins do bot neste grupo.');
+  lines.push('🛡️ Os admins do grupo no WhatsApp já são admins do bot.' + (admins.length ? ` Na lista do bot: ${admins.join(', ')}.` : ''));
   if (type === 'tecnico') {
     lines.push('Usa a mesma base técnica dos outros grupos. Os admins acima são os sêniores que revisam as respostas (/correto, /corrigir...).');
     lines.push('Perguntas: /duvida + a pergunta. Mande #ajuda para ver tudo.');

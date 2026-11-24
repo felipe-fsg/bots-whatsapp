@@ -82,7 +82,7 @@ describe('#ativarbot no grupo', () => {
     const admins = await sql`select phone from bot_admins where bot_id = ${b!.id} order by phone`;
     expect(admins.map((a) => a.phone)).toEqual([BOT, '5511955554444']);
     expect(wa.last()).toContain('*social*');
-    expect(wa.last()).toContain('Carla');
+    expect(wa.last()).toContain('admins do grupo no WhatsApp');
 
     // daqui em diante o grupo é atendido pelo módulo
     wa.clear();
@@ -127,6 +127,47 @@ describe('#ativarbot no grupo', () => {
     expect(wa.last()).toContain('Não entendi o tipo "cachorro"');
     expect(wa.last()).toContain('#ativarbot duvidas tecnicas');
     expect(await botRow()).toBeUndefined();
+  });
+
+  it('o número do bot e os donos rodam comandos de admin (#promover) no grupo ativado', async () => {
+    await send({ phone: BOT, name: 'Felipe', text: '#ativarbot social', fromMe: true });
+    const b = await botRow();
+    // o eco da resposta do próprio bot (também chega como fromMe) não é tratado como comando
+    wa.clear();
+    expect(await send({ phone: BOT, text: '#agenda', fromMe: true })).toBe('handled');
+    expect(wa.last().toLowerCase()).toContain('agenda');
+    const echo = wa.last();
+    wa.clear();
+    expect(await send({ phone: BOT, text: echo, fromMe: true })).toBe('ignored');
+    // conversa normal digitada no número do bot continua ignorada
+    expect(await send({ phone: BOT, text: 'oi gente', fromMe: true })).toBe('ignored');
+
+    await send({ phone: BOT, text: '#promover 11 95555-4444', fromMe: true });
+    expect(wa.last()).toContain('agora é admin');
+    // dono do BOT_DONOS, sem estar na lista de admins do grupo
+    await send({ phone: DONO, text: '#promover 11 94444-3333' });
+    expect(wa.last()).toContain('agora é admin');
+    const admins = await sql`select phone from bot_admins where bot_id = ${b!.id} order by phone`;
+    expect(admins.map((a) => a.phone)).toEqual(expect.arrayContaining(['5511955554444', '5511944443333']));
+    // quem não é admin continua barrado
+    await send({ phone: '5511933332222', text: '#promover 11 92222-1111' });
+    expect(wa.last()).toContain('Só os admins');
+  });
+
+  it('admins do grupo no WhatsApp são admins do bot, inclusive com número escondido (LID)', async () => {
+    await send({ phone: DONO, text: '#ativarbot social' });
+    wa.members = [
+      { jid: '5511966665555@s.whatsapp.net', phone: '5511966665555', admin: true, name: 'Gabi' },
+      { jid: '999888777666555@lid', lid: '999888777666555@lid', phone: '999888777666555', admin: true },
+      { jid: '5511933332222@s.whatsapp.net', phone: '5511933332222', admin: false },
+    ];
+    await sql`insert into wa_contacts (connection_id, lid, phone) values (${conn}, '999888777666555@lid', '5511988887777')`;
+    await send({ phone: '5511966665555', text: '#promover 11 91111-0000' });
+    expect(wa.last()).toContain('agora é admin');
+    await send({ phone: '5511988887777', text: '#promover 11 91111-2222' });
+    expect(wa.last()).toContain('agora é admin');
+    await send({ phone: '5511933332222', text: '#promover 11 91111-3333' });
+    expect(wa.last()).toContain('Só os admins');
   });
 
   it('ignora quem não é o dono', async () => {
