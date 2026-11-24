@@ -142,6 +142,8 @@ export interface BotContext {
   /** Manda texto no grupo e devolve o id da mensagem (para achar respostas a ela depois). */
   replyWithId(text: string): Promise<string>;
   isAdmin(phone: string): Promise<boolean>;
+  /** Telefones dos admins do grupo no WhatsApp (null se a AvisaAPI não mostrar a lista). */
+  groupAdmins?(): Promise<string[] | null>;
   /** Fuso horário do grupo (bots.settings.timezone, padrão America/Sao_Paulo). */
   timezone: string;
   /** Nome que a pessoa usa no WhatsApp, aprendido das mensagens. */

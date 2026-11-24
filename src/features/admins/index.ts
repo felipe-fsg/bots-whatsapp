@@ -53,10 +53,18 @@ async function demote(ctx: BotContext, msg: InboundMessage, rest: string): Promi
 
 async function list(ctx: BotContext): Promise<void> {
   const admins = await ctx.sql<{ phone: string; name: string | null }[]>`select phone, name from bot_admins where bot_id = ${ctx.bot.id} order by name`;
-  const names = await Promise.all(admins.map(async (a) => (await ctx.nameOf(a.phone)) || a.name || prettyPhone(a.phone)));
-  await ctx.reply(
-    `🛡️ *Admins do bot*\n${names.map((n) => `• ${n}`).join('\n') || '• ninguém'}\n\nOs admins do grupo no WhatsApp também são admins do bot.`,
+  const fromGroup = ctx.groupAdmins ? await ctx.groupAdmins() : null;
+  const phones = [...admins.map((a) => a.phone)];
+  for (const p of fromGroup ?? []) if (!phones.some((x) => samePhone(x, p))) phones.push(p);
+  const saved = new Map(admins.map((a) => [a.phone, a.name]));
+  const names = await Promise.all(phones.map(async (p) => (await ctx.nameOf(p)) || saved.get(p) || prettyPhone(p)));
+  const lines = [`🛡️ *Admins do bot*`, names.map((n) => `• ${n}`).join('\n') || '• ninguém'];
+  lines.push(
+    fromGroup
+      ? '\nOs admins do grupo no WhatsApp entram nesta lista automaticamente.'
+      : '\n⚠️ Não consegui ver os admins do grupo no WhatsApp agora. Use #promover @pessoa para adicionar alguém.',
   );
+  await ctx.reply(lines.join('\n'));
 }
 
 /** #ban respondendo à mensagem de alguém: tira a pessoa do grupo. */

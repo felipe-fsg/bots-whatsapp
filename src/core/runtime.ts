@@ -209,6 +209,10 @@ export class Runtime {
           order by updated_at desc limit 1`;
         return rows[0]?.push_name ?? '';
       },
+      groupAdmins: async () => {
+        const list = await this.groupAdmins(conn.id, bot.chatJid, wa);
+        return list.length ? list : null;
+      },
       isAdmin: async (phone) => {
         // o próprio número do bot e os donos (BOT_DONOS) são admins em todos os grupos
         if (conn.own_phone && samePhone(conn.own_phone, phone)) return true;
