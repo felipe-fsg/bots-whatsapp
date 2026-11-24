@@ -65,6 +65,10 @@ export class Runtime {
     this.now = deps.now ?? (() => new Date());
   }
 
+  get sql(): Sql {
+    return this.deps.sql;
+  }
+
   /** Esquece o cache de bots (depois de cadastrar um bot novo, por exemplo). */
   invalidate(): void {
     this.cache = null;

@@ -32,7 +32,7 @@ const cleanup = setInterval(
   24 * 3_600_000,
 );
 
-const app = buildServer(runtime, { secret: config.WEBHOOK_SECRET, logger: log });
+const app = buildServer(runtime, { secret: config.WEBHOOK_SECRET, logger: log, aguaKey: config.AGUA_API_KEY });
 await app.listen({ host: '0.0.0.0', port: config.PORT });
 
 async function shutdown() {

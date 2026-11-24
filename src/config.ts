@@ -15,6 +15,9 @@ const schema = z.object({
   QDRANT_API_KEY: z.string().optional(),
   QDRANT_COLLECTION: z.string().default('gss_base_tecnica'),
   GEMINI_EMBEDDING_MODEL: z.string().default('gemini-embedding-2'),
+  // Bot de qualidade da água: chave do sistema de laudos (Authorization: Bearer) e retorno das decisões
+  AGUA_API_KEY: z.string().min(16).optional(),
+  AGUA_CALLBACK_URL: z.string().url().optional(),
   LOG_LEVEL: z.string().default('info'),
   // false desliga os agendamentos (útil em testes e em mais de uma réplica)
   SCHEDULER: z.enum(['on', 'off']).default('on'),
