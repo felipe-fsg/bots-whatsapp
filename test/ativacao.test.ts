@@ -168,6 +168,18 @@ describe('#ativarbot no grupo', () => {
     expect(wa.last()).toContain('agora é admin');
     await send({ phone: '5511933332222', text: '#promover 11 91111-3333' });
     expect(wa.last()).toContain('Só os admins');
+
+    await send({ phone: '5511933332222', text: '#admins' });
+    expect(wa.last()).not.toContain('ninguém');
+    expect(wa.last().split('•').length - 1).toBeGreaterThanOrEqual(4); // 2 promovidos + 2 admins do grupo
+    expect(wa.last()).toContain('entram nesta lista automaticamente');
+  });
+
+  it('#admins avisa quando não dá para ver os admins do grupo no WhatsApp', async () => {
+    await send({ phone: DONO, text: '#ativarbot social' });
+    wa.clear();
+    await send({ phone: '5511933332222', text: '#admins' });
+    expect(wa.last()).toContain('Não consegui ver os admins do grupo');
   });
 
   it('ignora quem não é o dono', async () => {
