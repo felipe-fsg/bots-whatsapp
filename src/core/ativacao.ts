@@ -10,12 +10,13 @@ import type { InboundMessage, Logger, WhatsAppProvider } from './types.js';
 import { digits, samePhone } from './phone.js';
 import { foldCommand } from './commands.js';
 
-export type BotType = 'tecnico' | 'geral' | 'splinter';
+export type BotType = 'tecnico' | 'geral' | 'splinter' | 'agua';
 
 export const BOT_TYPES: Record<BotType, { label: string; defaultName: string }> = {
   tecnico: { label: 'dúvidas técnicas', defaultName: 'Dúvidas técnicas' },
   geral: { label: 'social', defaultName: 'Bot social' },
   splinter: { label: 'fitness', defaultName: 'Desafio fitness' },
+  agua: { label: 'qualidade agua', defaultName: 'Qualidade da água' },
 };
 
 export type AtivacaoCommand = { action: 'ativar'; module: BotType | null; typed: string } | { action: 'desativar' };
@@ -23,6 +24,7 @@ export type AtivacaoCommand = { action: 'ativar'; module: BotType | null; typed:
 /** Lê o tipo escrito depois do comando ('duvidas tecnicas', 'social', 'fitness'...). */
 export function parseBotType(text: string): BotType | null {
   const t = foldCommand(text).replace(/[^a-z ]/g, ' ');
+  if (/agua|laudo/.test(t)) return 'agua';
   if (/tecnic|duvida|profission|trabalho/.test(t)) return 'tecnico';
   if (/fitness|fit\b|desafio|splinter|academia|treino/.test(t)) return 'splinter';
   if (/social|geral|conversa|amigos|turma/.test(t)) return 'geral';
@@ -55,6 +57,7 @@ const OPTIONS = [
   '• *#ativarbot social* - grupo de amigos (mascote, agenda, resumo, brincadeiras)',
   '• *#ativarbot fitness* - desafio fitness (check-ins com foto, pontos e ranking)',
   '• *#ativarbot duvidas tecnicas* - grupo de trabalho (/duvida com a base técnica)',
+  '• *#ativarbot qualidade agua* - grupo de trabalho que autoriza os laudos de análise de água',
   '• *#desativarbot* - desliga o bot neste grupo (os dados ficam guardados)',
 ].join('\n');
 
@@ -118,6 +121,9 @@ export async function runAtivacao(d: Deps, msg: InboundMessage, cmd: AtivacaoCom
   if (type === 'tecnico') {
     lines.push('Usa a mesma base técnica dos outros grupos. Os admins acima são os sêniores que revisam as respostas (/correto, /corrigir...).');
     lines.push('Perguntas: /duvida + a pergunta. Mande #ajuda para ver tudo.');
+  } else if (type === 'agua') {
+    lines.push('Os laudos chegam pelo sistema de análise. Os admins acima autorizam com #aprovar ou #recusar (respondendo à mensagem do laudo).');
+    lines.push('Mande #ajuda para ver os comandos.');
   } else if (type === 'splinter') {
     const [ch] = await d.sql<{ name: string }[]>`select name from splinter_challenges where bot_id = ${bot!.id} and status = 'ativo' limit 1`;
     if (ch) lines.push(`Desafio ativo: *${ch.name}*.`);
