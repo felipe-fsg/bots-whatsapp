@@ -20,11 +20,14 @@ export function helpText(mascot: string): string {
     '• #engajamento - ranking de quem mais manda mensagens no grupo',
     '• #quem + pergunta - sorteia alguém do grupo. Ex.: #quem vai mandar um ifood pra mim?',
     '• #tarot + pergunta (opcional) - o mascote tira 3 cartas e lê a sua sorte (1 por dia). Ex.: #tarot vou passar no concurso?',
+    '• #nascimento + data - registra seu aniversário para ganhar parabéns no dia (ano opcional). Ex.: #nascimento 15/03 (#aniversariantes mostra os do mês)',
+    '• #horoscopo - o horóscopo do dia do seu signo (1 por dia). Ou de outro signo: #horoscopo leão',
     `• Para conversar com o mascote, comece a mensagem com "${mascot.split(' ').pop()}"`,
     '',
     '🛡️ *Admins*',
     '• #agendar - responda à sugestão do rolê (ou: #agendar Nome | 15/11 19h | Local)',
     '• #cancelarevento nome do evento',
+    '• #ativarlembretes / #desativarlembretes - liga ou desliga os lembretes da agenda (segunda às 9h; na semana do evento, todo dia às 9h, marcando todo mundo)',
     '• #mascote Nome do personagem - troca o mascote (#mascote padrão volta ao original)',
     '• #boasvindas - mostra ou troca a mensagem para quem entra no grupo',
     '• #promover @pessoa / #demover @pessoa - dá ou tira a função de admin do bot (#admins lista)',
@@ -32,6 +35,8 @@ export function helpText(mascot: string): string {
     '• #ban - respondendo à mensagem de alguém, tira a pessoa do grupo',
     '• #fechargrupo / #abrirgrupo - só admins mandam mensagens / libera para todos',
     '• #ativarBAN / #desativarBAN - aviso semanal de quem está sumido há 7 dias (sai do grupo depois do 3º aviso)',
+    '• #sumidos - (admins) mostra quem seria avisado agora, sem avisar ninguém',
+    '• #carrodoban - (admins) roda agora a verificação de sumidos e aplica os avisos (e remoções)',
     '• #curiar / #nãocuriar - liga ou desliga o pedido de fotos às 10h, 15h e 21h',
   ].join('\n');
 }

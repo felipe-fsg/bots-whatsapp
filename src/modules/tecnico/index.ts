@@ -55,6 +55,7 @@ export function helpText(): string {
     '• /restaurar - traz de volta uma resposta excluída',
     '• #suporte + o problema ou a melhoria - manda o pedido para a equipe do bot resolver',
     '• #fechargrupo / #abrirgrupo - só admins mandam mensagens / libera para todos',
+    '• #ativarlembretes / #desativarlembretes - liga ou desliga os lembretes da agenda',
   ].join('\n');
 }
 

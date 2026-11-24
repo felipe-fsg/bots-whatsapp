@@ -4,6 +4,7 @@ import multipart from '@fastify/multipart';
 import { timingSafeEqual } from 'node:crypto';
 import type { Runtime } from './core/runtime.js';
 import { parseWhatsmeowEvent } from './core/whatsapp/whatsmeow.js';
+import { registerAguaApi } from './modules/agua/api.js';
 
 interface Payload {
   jsonData: string;
@@ -16,7 +17,7 @@ function sameSecret(a: string, b: string): boolean {
   return x.length === y.length && timingSafeEqual(x, y);
 }
 
-export function buildServer(runtime: Runtime, opts: { secret: string; logger?: Pino }) {
+export function buildServer(runtime: Runtime, opts: { secret: string; logger?: Pino; aguaKey?: string }) {
   const app = Fastify({ ...(opts.logger ? { loggerInstance: opts.logger } : {}), bodyLimit: 20 * 1024 * 1024 });
   void app.register(multipart, { limits: { fileSize: 20 * 1024 * 1024, files: 1 } });
 
@@ -33,6 +34,9 @@ export function buildServer(runtime: Runtime, opts: { secret: string; logger?: P
   });
 
   app.get('/health', async () => ({ ok: true }));
+
+  // Bot de qualidade da água: o sistema de laudos manda resultados e consulta as decisões.
+  registerAguaApi(app, runtime, opts.aguaKey);
 
   // A AvisaAPI manda um POST por evento: campo jsonData (texto JSON do whatsmeow) e, quando há mídia, o arquivo "file".
   app.post<{ Params: { connectionId: string }; Querystring: { key?: string } }>(

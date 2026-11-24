@@ -99,3 +99,91 @@ describe('comandos para todos', () => {
     expect(w.ai.prompts.at(-1)).toContain('Ana tem 1 pontos (1º de 3). Check-ins válidos hoje: Treino');
   });
 });
+
+describe('lembretes da agenda', () => {
+  const ctxOf = async (x: World) => x.runtime.context((await x.runtime.activeBots())[0]!);
+  const job = () => agenda.jobs!.find((j) => j.name === 'lembretes-agenda')!;
+  const BOT = '5511999990000';
+
+  it('semanal na segunda, diário na semana do evento, marcando todo mundo; admin desliga', async () => {
+    w = await world({ challenge: { status: 'encerrado' } });
+    w.wa.members = [
+      { jid: `${ANA}@s.whatsapp.net`, phone: ANA },
+      { jid: `${BRUNO}@s.whatsapp.net`, phone: BRUNO },
+      { jid: `${BOT}@s.whatsapp.net`, phone: BOT },
+    ];
+    await w.sql`update wa_connections set own_phone = ${BOT}`;
+    const mentioned: string[][] = [];
+    Object.assign(w.wa, {
+      sendTextMentions: async (chat: string, text: string, jids: string[]) => {
+        mentioned.push(jids);
+        w!.wa.sent.push({ chat, text });
+      },
+    });
+    w.runtime.invalidate();
+    expect(job().cron).toBe('0 9 * * *');
+
+    // segunda 09/11: sem eventos, nada
+    w.now.value = new Date('2026-11-09T12:00:00Z');
+    await job().run(await ctxOf(w));
+    expect(w.wa.sent).toHaveLength(0);
+
+    await w.send({ phone: ADMIN, name: 'Felipe', at: '2026-11-09T12:01:00Z', text: '#agendar Churrasco | 20/11 19h | Casa do Erick' });
+    await w.send({ phone: ADMIN, name: 'Felipe', at: '2026-11-09T12:02:00Z', text: '#agendar Festa de fim de ano | 19/12 21h' });
+    await w.send({ phone: ANA, name: 'Ana', at: '2026-11-09T12:03:00Z', text: '#comparecer churrasco' });
+    w.wa.clear();
+
+    // segunda 09/11 às 9h (12h UTC): os dois estão a mais de 6 dias -> lembrete semanal
+    await job().run(await ctxOf(w));
+    expect(w.wa.last()).toBe(
+      '⏰ *Lembrete da agenda*\n\n📅 *Próximos eventos*\n\n• *Churrasco* - sex, 20/11 às 19:00\n   📍 Casa do Erick\n   ✅ Confirmados: 1\n\n• *Festa de fim de ano* - sáb, 19/12 às 21:00\n   ✅ Confirmados: 0\n\nQuem vai, mande: #comparecer nome do evento\nVer tudo: #agenda',
+    );
+    expect(mentioned.at(-1)).toEqual([`${ANA}@s.whatsapp.net`, `${BRUNO}@s.whatsapp.net`]);
+
+    // rodar de novo no mesmo dia não repete
+    await job().run(await ctxOf(w));
+    expect(w.wa.sent).toHaveLength(1);
+
+    // terça 10/11: churrasco a 10 dias, não é segunda -> nada
+    w.now.value = new Date('2026-11-10T12:00:00Z');
+    await job().run(await ctxOf(w));
+    expect(w.wa.sent).toHaveLength(1);
+
+    // sábado 14/11: churrasco a 6 dias -> diário
+    w.now.value = new Date('2026-11-14T12:00:00Z');
+    await job().run(await ctxOf(w));
+    expect(w.wa.last()).toContain('📌 *Churrasco* faltam *6 dias*! (sex, 20/11 às 19:00)');
+    expect(w.wa.last()).not.toContain('Festa');
+
+    // segunda 16/11: churrasco no diário + festa no semanal
+    w.now.value = new Date('2026-11-16T12:00:00Z');
+    await job().run(await ctxOf(w));
+    expect(w.wa.last()).toContain('*Churrasco* faltam *4 dias*');
+    expect(w.wa.last()).toContain('📅 *Mais para frente*\n\n• *Festa de fim de ano* - sáb, 19/12 às 21:00');
+
+    w.now.value = new Date('2026-11-19T12:00:00Z');
+    await job().run(await ctxOf(w));
+    expect(w.wa.last()).toContain('*Churrasco* é *amanhã*!');
+    w.now.value = new Date('2026-11-20T12:00:00Z');
+    await job().run(await ctxOf(w));
+    expect(w.wa.last()).toContain('🔥 *Churrasco* é *HOJE*!');
+
+    // só admin desliga
+    await w.send({ phone: ANA, at: '2026-11-20T13:00:00Z', text: '#desativarlembretes' });
+    expect(w.wa.last()).toContain('Só os admins');
+    await w.send({ phone: ADMIN, at: '2026-11-20T13:01:00Z', text: '#desativar lembretes' });
+    expect(w.wa.last()).toContain('Lembretes da agenda desligados');
+    await w.send({ phone: ANA, at: '2026-11-20T13:02:00Z', text: '#lembretes' });
+    expect(w.wa.last()).toContain('*desligados*');
+    const n = w.wa.sent.length;
+    w.now.value = new Date('2026-12-14T12:00:00Z');
+    await job().run(await ctxOf(w));
+    expect(w.wa.sent).toHaveLength(n);
+
+    await w.send({ phone: ADMIN, at: '2026-12-14T13:00:00Z', text: '#AtivarLembretes' });
+    expect(w.wa.last()).toContain('Lembretes da agenda ligados');
+    w.now.value = new Date('2026-12-15T12:00:00Z');
+    await job().run(await ctxOf(w));
+    expect(w.wa.last()).toContain('*Festa de fim de ano* faltam *4 dias*');
+  });
+});

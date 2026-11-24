@@ -1,6 +1,7 @@
 import type { BotContext, BotModule, InboundMessage } from '../../core/types.js';
 import { local } from '../../core/time.js';
 import { digits } from '../../core/phone.js';
+import { REMINDER_CRON, handleReminderCommand, reminderJob } from './lembretes.js';
 import { eventPrompt, matchEvent, parseAgendaCommand, parseExplicit, type EventDraft } from './parse.js';
 
 interface EventRow {
@@ -150,6 +151,7 @@ export const agenda: BotModule = {
   id: 'agenda',
   async handle(ctx, msg) {
     if (msg.type !== 'text') return false;
+    if (await handleReminderCommand(ctx, msg)) return true;
     const cmd = parseAgendaCommand(msg.text);
     if (!cmd) return false;
     switch (cmd.type) {
@@ -180,6 +182,12 @@ export const agenda: BotModule = {
         await ctx.sql`update events set status = 'passado'
           where bot_id = ${ctx.bot.id} and status = 'agendado' and starts_on < ${today(ctx)}`;
       },
+    },
+    {
+      // Lembrete às 9h: semanal (segunda) e diário na semana do evento, marcando todo mundo.
+      name: 'lembretes-agenda',
+      cron: REMINDER_CRON,
+      run: (ctx) => reminderJob(ctx, upcoming, when),
     },
   ],
 };
