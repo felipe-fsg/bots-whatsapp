@@ -3,6 +3,7 @@ import { local } from '../../core/time.js';
 import { SplinterRepo } from './repo.js';
 import * as P from './prompts.js';
 import { br } from '../../core/time.js';
+import { congratulateDay } from './aberta.js';
 
 /** Treinos que ficaram sem localização no prazo vão para a revisão dos admins. */
 async function expireLocations(ctx: BotContext): Promise<void> {
@@ -82,4 +83,5 @@ async function mestreSplinter(ctx: BotContext): Promise<void> {
 export const splinterJobs: ScheduledJob[] = [
   { name: 'localizacao-vencida', cron: '*/5 * * * *', run: expireLocations },
   { name: 'mestre-splinter', cron: '0 4-23 * * *', run: mestreSplinter },
+  { name: 'parabens-do-dia', cron: '0 6 * * *', run: (ctx) => congratulateDay(ctx, new SplinterRepo(ctx.sql)) },
 ];

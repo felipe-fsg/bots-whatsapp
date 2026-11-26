@@ -26,6 +26,7 @@ import { splinterJobs } from './jobs.js';
 import { activitiesText, toggleActivities } from './atividades.js';
 import { rememberPhoto, rememberTag, takePhoto, takeTag } from './pendentes.js';
 import { answerReset, askReset, togglePause } from './controle.js';
+import { selfEnroll, toggleCongrats, toggleOpen } from './aberta.js';
 
 export const splinter: BotModule = {
   id: 'splinter',
@@ -40,7 +41,12 @@ export const splinter: BotModule = {
       if (command.type === 'motivacao') return motivate(ctx, repo, msg);
       if (command.type === 'alimento') return answerFood(ctx, repo, await repo.currentChallenge(ctx.bot.id), command.food);
       if (command.type === 'ajuda') return ctx.reply(M.helpText());
+      // competição aberta: funcionam mesmo sem desafio cadastrado
+      if (command.type === 'monitorar') return toggleOpen(ctx, repo, msg, command.on);
+      if (command.type === 'ficargostoso') return selfEnroll(ctx, repo, msg);
+      if (command.type === 'parabens') return toggleCongrats(ctx, repo, msg, command.on);
       const ch = await repo.currentChallenge(ctx.bot.id);
+      if (!ch && command.type === 'regras') return ctx.reply(M.noChallengeRules());
       if (ch) await runCommand(ctx, repo, ch, msg, command);
       return;
     }
@@ -92,7 +98,7 @@ async function checkinPhoto(ctx: BotContext, repo: SplinterRepo, ch: Challenge, 
   }
 
   const participant = await repo.participantByPhone(ch.id, msg.senderPhone);
-  if (!participant?.active) return ctx.reply(M.notEnrolled(msg.pushName));
+  if (!participant?.active) return ctx.reply(M.notEnrolled(msg.pushName, ch.open_mode));
   if (!rule) return ctx.reply(M.activityOff(msg.pushName, off!.category));
   if (ch.paused) return ctx.reply(M.paused(msg.pushName));
   const day = localDay(msg.timestamp, ch.timezone);
@@ -264,9 +270,12 @@ async function runCommand(ctx: BotContext, repo: SplinterRepo, ch: Challenge, ms
   if (PARTICIPANT_COMMANDS.has(cmd.type) && !(await ctx.isAdmin(msg.senderPhone))) {
     const p = await repo.participantByPhone(ch.id, msg.senderPhone);
     if (!p?.active) {
-      if (cmd.type === 'regras') return ctx.reply(`${M.rulesText(ch, await repo.rules(ch.id))}\n\n${M.notEnrolled(msg.pushName)}`);
-      return ctx.reply(M.notEnrolled(msg.pushName));
+      if (cmd.type === 'regras') return ctx.reply(`${M.rulesText(ch, await repo.rules(ch.id))}\n\n${M.notEnrolled(msg.pushName, ch.open_mode)}`);
+      return ctx.reply(M.notEnrolled(msg.pushName, ch.open_mode));
     }
+  }
+  if (ch.open_mode && (cmd.type === 'equipes' || cmd.type === 'equipe')) {
+    return ctx.reply('ℹ️ Na competição aberta não tem duplas nem equipes: cada um pontua por si. Veja o ranking com #ranking.');
   }
   switch (cmd.type) {
     case 'ranking':
@@ -352,7 +361,7 @@ async function motivate(ctx: BotContext, repo: SplinterRepo, msg: InboundMessage
 
 async function saveOwnPlace(ctx: BotContext, repo: SplinterRepo, ch: Challenge, msg: InboundMessage, name: string) {
   const participant = await repo.participantByPhone(ch.id, msg.senderPhone);
-  if (!participant) return ctx.reply(M.notEnrolled(msg.pushName));
+  if (!participant) return ctx.reply(M.notEnrolled(msg.pushName, ch.open_mode));
   const loc = msg.quoted?.location;
   if (!loc || !name) {
     return ctx.reply('📍 Para cadastrar seu local de treino, mande sua localização e depois responda a ela com #meulocal Nome do local. Ex.: #meulocal Academia do prédio');

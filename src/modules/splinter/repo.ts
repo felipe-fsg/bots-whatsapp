@@ -24,6 +24,91 @@ export class SplinterRepo {
     return rows[0] ?? null;
   }
 
+  /** Desafio aberto (#monitorartreinos) mais recente do bot, em qualquer situação. */
+  async lastOpenChallenge(botId: string): Promise<Challenge | null> {
+    const rows = await this.sql<Challenge[]>`
+      select * from splinter_challenges where bot_id = ${botId} and open_mode order by created_at desc limit 1`;
+    return rows[0] ?? null;
+  }
+
+  /**
+   * Liga a competição aberta: reativa a última que existiu (mantém inscritos e pontos) ou cria
+   * uma nova com as categorias e regras do último desafio do bot (ou as padrão, se nunca houve).
+   */
+  async startOpenChallenge(botId: string, today: string, defaults: { rules: Omit<Rule, 'id'>[]; settings: Partial<Challenge> }): Promise<{ ch: Challenge; created: boolean }> {
+    const old = await this.lastOpenChallenge(botId);
+    if (old) {
+      const [ch] = await this.sql<Challenge[]>`
+        update splinter_challenges set status = 'ativo', ends_on = greatest(ends_on, ${today}::date) where id = ${old.id} returning *`;
+      return { ch: ch!, created: false };
+    }
+    return this.sql.begin(async (tx) => {
+      const [model] = await tx<Challenge[]>`
+        select * from splinter_challenges where bot_id = ${botId} and not open_mode order by created_at desc limit 1`;
+      const copy = model
+        ? {
+            checkin_deadline: model.checkin_deadline,
+            require_location: model.require_location,
+            location_window_min: model.location_window_min,
+            location_radius_m: model.location_radius_m,
+            place_types: model.place_types,
+            max_workouts_week: model.max_workouts_week,
+            ai_photo_check: model.ai_photo_check,
+            require_pose: model.require_pose,
+            confirm_valid: model.confirm_valid,
+            timezone: model.timezone,
+          }
+        : {};
+      const row = {
+        ...defaults.settings,
+        ...copy,
+        bot_id: botId,
+        name: 'Competição aberta de treinos',
+        starts_on: today,
+        ends_on: '2099-12-31',
+        status: 'ativo',
+        open_mode: true,
+        daily_congrats: true,
+        team_bonus_points: 0,
+        daily_summary: false,
+        persona_messages: false,
+      };
+      const [ch] = await tx<Challenge[]>`insert into splinter_challenges ${tx(row as Record<string, unknown>)} returning *`;
+      const rules = model
+        ? await tx<Rule[]>`select category, hashtag, kind, points, max_per_day, active from splinter_rules where challenge_id = ${model.id} order by id`
+        : defaults.rules;
+      for (const r of rules) {
+        await tx`insert into splinter_rules (challenge_id, category, hashtag, kind, points, max_per_day, active)
+          values (${ch!.id}, ${r.category}, ${r.hashtag}, ${r.kind}, ${r.points}, ${r.max_per_day}, ${r.active})`;
+      }
+      if (model) {
+        await tx`insert into splinter_foods (challenge_id, name, verdict)
+          select ${ch!.id}, name, verdict from splinter_foods where challenge_id = ${model.id} on conflict do nothing`;
+        await tx`insert into splinter_places (challenge_id, participant_id, name, lat, lng)
+          select ${ch!.id}, null, name, lat, lng from splinter_places where challenge_id = ${model.id} and participant_id is null`;
+      }
+      return { ch: ch!, created: true };
+    });
+  }
+
+  async stopChallenge(challengeId: string): Promise<void> {
+    await this.sql`update splinter_challenges set status = 'encerrado' where id = ${challengeId}`;
+  }
+
+  async setDailyCongrats(challengeId: string, on: boolean): Promise<void> {
+    await this.sql`update splinter_challenges set daily_congrats = ${on} where id = ${challengeId}`;
+  }
+
+  /** Pontos válidos de cada participante num dia, do maior para o menor (só quem pontuou). */
+  dayScores(challengeId: string, day: string) {
+    return this.sql<{ phone: string; name: string; points: number; categories: string[] }[]>`
+      select p.phone, coalesce(nullif(p.ranking_name, ''), p.name) as name, sum(c.points)::float8 as points,
+             array_agg(c.category order by c.sent_at) as categories
+      from splinter_checkins c join splinter_participants p on p.id = c.participant_id and p.active
+      where c.challenge_id = ${challengeId} and c.status = 'valido' and c.day = ${day}
+      group by p.id having sum(c.points) > 0 order by points desc, name`;
+  }
+
   rules(challengeId: string): Promise<Rule[]> {
     return this.sql<Rule[]>`
       select id, category, hashtag, kind, points, max_per_day, active from splinter_rules
