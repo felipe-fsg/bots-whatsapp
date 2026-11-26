@@ -46,6 +46,7 @@ export const splinter: BotModule = {
       if (command.type === 'ficargostoso') return selfEnroll(ctx, repo, msg);
       if (command.type === 'parabens') return toggleCongrats(ctx, repo, msg, command.on);
       const ch = await repo.currentChallenge(ctx.bot.id);
+      if (!ch && command.type === 'regras') return ctx.reply(M.noChallengeRules());
       if (ch) await runCommand(ctx, repo, ch, msg, command);
       return;
     }

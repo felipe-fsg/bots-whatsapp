@@ -5,7 +5,7 @@
  * quem mais pontuou (#desativarparabens / #ativarparabens).
  */
 import type { BotContext, InboundMessage } from '../../core/types.js';
-import { localDay, br } from '../../core/time.js';
+import { local, localDay, br } from '../../core/time.js';
 import type { SplinterRepo } from './repo.js';
 import type { Challenge, Rule } from './types.js';
 import { displayName } from './types.js';
@@ -62,7 +62,7 @@ export async function toggleOpen(ctx: BotContext, repo: SplinterRepo, msg: Inbou
       '📸 Depois é só mandar foto com a hashtag na legenda:',
       ...rules.map((r) => `• ${r.hashtag} - ${r.category}: ${fmt(r.points)} ponto(s)`),
       '',
-      `🏆 Todo dia às 23h59 o ${mascot} dá os parabéns a quem mais pontuou.`,
+      `🏆 Todo dia às 6h o ${mascot} dá os parabéns a quem mais pontuou no dia anterior.`,
       'Ranking: #ranking. Regras completas: #regras.',
     ]
       .filter((l, i) => i !== 1 || l)
@@ -105,16 +105,16 @@ export async function toggleCongrats(ctx: BotContext, repo: SplinterRepo, msg: I
   await repo.setDailyCongrats(ch.id, on);
   return ctx.reply(
     on
-      ? '✅ Parabéns do dia ligados: todo dia às 23h59 o mascote parabeniza quem mais pontuou.'
+      ? '✅ Parabéns do dia ligados: todo dia às 6h o mascote parabeniza quem mais pontuou no dia anterior.'
       : '⛔ Parabéns do dia desligados. Para voltar: #ativarparabens',
   );
 }
 
-/** Job das 23h59: parabeniza quem teve a maior pontuação do dia (empates levam todos). */
+/** Job das 6h: parabeniza quem teve a maior pontuação do dia anterior (empates levam todos). */
 export async function congratulateDay(ctx: BotContext, repo: SplinterRepo): Promise<void> {
   const ch = await repo.activeChallenge(ctx.bot.id);
   if (!ch?.open_mode || !ch.daily_congrats || ch.paused) return;
-  const day = localDay(ctx.now(), ch.timezone);
+  const day = local(ctx.now(), ch.timezone).minus({ days: 1 }).toISODate()!;
   const scores = await repo.dayScores(ch.id, day);
   if (!scores.length) return;
   const best = scores[0]!.points;
@@ -134,7 +134,7 @@ export async function congratulateDay(ctx: BotContext, repo: SplinterRepo): Prom
   }
   if (!text) text = winners.length > 1 ? 'Empate no topo! Disciplina assim merece reverência. Amanhã tem mais. 🐀🥋' : 'Disciplina assim merece reverência. Amanhã tem mais. 🐀🥋';
 
-  const head = `🏆 *Destaque${winners.length > 1 ? 's' : ''} do dia (${br(day)})*`;
+  const head = `🏆 *Destaque${winners.length > 1 ? 's' : ''} de ontem (${br(day)})*`;
   const line = (w: (typeof winners)[number], tag: boolean) =>
     `${tag ? `@${w.phone} (*${w.name}*)` : `*${w.name}*`} - ${fmt(w.points)} pts (${w.categories.join(', ')})`;
 

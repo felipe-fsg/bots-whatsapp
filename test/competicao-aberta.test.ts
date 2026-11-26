@@ -132,11 +132,11 @@ describe('parabéns do dia', () => {
     await w.send({ id: 'H1', phone: NOVO, at: '2026-11-09T13:00:00Z', image: { sha: 'h1', caption: '#agua' } });
     await w.send({ id: 'H2', phone: NOVO, at: '2026-11-09T13:01:00Z', image: { sha: 'h2', caption: '#cardio' } });
     await w.send({ id: 'H3', phone: OUTRA, at: '2026-11-09T13:02:00Z', image: { sha: 'h3', caption: '#agua' } });
-    w.now.value = new Date('2026-11-10T02:59:00Z'); // 23h59 em Brasília
+    w.now.value = new Date('2026-11-10T09:00:00Z'); // 6h do dia seguinte em Brasília
     w.wa.clear();
   }
 
-  it('às 23h59 o mascote parabeniza quem mais pontuou, marcando pelo telefone', async () => {
+  it('às 6h o mascote parabeniza quem mais pontuou no dia anterior, marcando pelo telefone', async () => {
     await dia();
     const tagged: { text: string; jids: string[] }[] = [];
     w.wa.sendTextMentions = async (_chat: string, text: string, jids: string[]) => {
@@ -145,7 +145,7 @@ describe('parabéns do dia', () => {
     w.ai.textAnswer = 'Carla brilhou hoje no dojô! 🐀';
     await runCongrats();
     expect(tagged).toHaveLength(1);
-    expect(tagged[0]!.text).toContain('Destaque do dia (09/11/2026)');
+    expect(tagged[0]!.text).toContain('Destaque de ontem (09/11/2026)');
     expect(tagged[0]!.text).toContain(`@${NOVO} (*Carla*) - 2 pts (Hidratação, Cardio)`);
     expect(tagged[0]!.text).toContain('Carla brilhou hoje');
     expect(tagged[0]!.text).not.toContain('Duda');
@@ -158,7 +158,7 @@ describe('parabéns do dia', () => {
     await dia();
     await w.sql`update splinter_checkins set status = 'recusado' where provider_msg_id = 'H2'`;
     await runCongrats();
-    expect(w.wa.last()).toContain('Destaques do dia');
+    expect(w.wa.last()).toContain('Destaques de ontem');
     expect(w.wa.last()).toContain('*Carla* - 1 pts');
     expect(w.wa.last()).toContain('*Duda* - 1 pts');
   });
@@ -176,25 +176,49 @@ describe('parabéns do dia', () => {
     await w.send({ phone: ADMIN, at: '2026-11-10T02:02:00Z', text: '#ativarparabens' });
     expect(w.wa.last()).toContain('Parabéns do dia ligados');
     await runCongrats();
-    expect(w.wa.last()).toContain('Destaque do dia');
+    expect(w.wa.last()).toContain('Destaque de ontem');
   });
 
   it('ninguém pontuou: fica em silêncio; competição normal não recebe parabéns', async () => {
     await semDesafio();
     await w.send({ phone: ADMIN, at: '2026-11-09T12:00:00Z', text: '#monitorartreinos' });
     w.wa.clear();
-    w.now.value = new Date('2026-11-10T02:59:00Z');
+    w.now.value = new Date('2026-11-10T09:00:00Z');
     await runCongrats();
     expect(w.wa.sent).toHaveLength(0);
 
     await w.sql.end();
     w = await world({ challenge: { require_location: false } });
     await w.send({ id: 'N1', phone: ANA, at: '2026-11-09T13:00:00Z', image: { sha: 'n1', caption: '#agua' } });
-    w.now.value = new Date('2026-11-10T02:59:00Z');
+    w.now.value = new Date('2026-11-10T09:00:00Z');
     w.wa.clear();
     await runCongrats();
     expect(w.wa.sent).toHaveLength(0);
     await w.send({ phone: ADMIN, at: '2026-11-10T02:59:00Z', text: '#desativarparabens' });
     expect(w.wa.last()).toContain('são da competição aberta');
+  });
+});
+
+describe('#ajuda e #regras separados', () => {
+  it('#ajuda só tem comandos gerais; #regras tem os do desafio fitness', async () => {
+    w = await world();
+    await w.send({ phone: ANA, at: '2026-11-09T12:00:00Z', text: '#ajuda' });
+    const ajuda = w.wa.last();
+    expect(ajuda).toContain('#motivação');
+    expect(ajuda).toContain('#regras');
+    for (const cmd of ['#ranking', '#atividades', '#pausar', '#reiniciar', '#monitorartreinos', '#ficargostoso', '#desativar pose']) {
+      expect(ajuda).not.toContain(cmd);
+    }
+    await w.send({ phone: ANA, at: '2026-11-09T12:01:00Z', text: '#regras' });
+    const regras = w.wa.last();
+    for (const cmd of ['#ranking', '#equipes', '#atividades', '#pausar', '#reiniciar', '#inscrever']) expect(regras).toContain(cmd);
+    for (const cmd of ['#motivação', '#agenda', '#tarot']) expect(regras).not.toContain(cmd);
+  });
+
+  it('#regras sem competição mostra como ligar a competição aberta', async () => {
+    await semDesafio();
+    await w.send({ phone: ANA, at: '2026-11-09T12:00:00Z', text: '#regras' });
+    expect(w.wa.last()).toContain('Não há competição rolando');
+    expect(w.wa.last()).toContain('#monitorartreinos');
   });
 });

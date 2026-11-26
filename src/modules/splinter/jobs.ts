@@ -83,5 +83,5 @@ async function mestreSplinter(ctx: BotContext): Promise<void> {
 export const splinterJobs: ScheduledJob[] = [
   { name: 'localizacao-vencida', cron: '*/5 * * * *', run: expireLocations },
   { name: 'mestre-splinter', cron: '0 4-23 * * *', run: mestreSplinter },
-  { name: 'parabens-do-dia', cron: '59 23 * * *', run: (ctx) => congratulateDay(ctx, new SplinterRepo(ctx.sql)) },
+  { name: 'parabens-do-dia', cron: '0 6 * * *', run: (ctx) => congratulateDay(ctx, new SplinterRepo(ctx.sql)) },
 ];

@@ -78,10 +78,10 @@ Dados:
 ${facts}`;
 }
 
-/** Parabéns das 23h59 da competição aberta. O cabeçalho com os nomes e pontos vai antes, montado pelo bot. */
+/** Parabéns das 6h (resultado do dia anterior) da competição aberta. O cabeçalho com os nomes e pontos vai antes, montado pelo bot. */
 export function congratsPrompt(day: string, winners: string, nWinners: number, nScored: number): string {
-  return `Está terminando o dia ${day} na competição aberta de treinos do grupo. Escreva os parabéns para ${nWinners > 1 ? 'as pessoas que empataram com' : 'a pessoa que fez'} a maior pontuação do dia, chamando pelo nome e comentando as atividades que fez. Depois, em uma frase, convide o resto da turma a tentar amanhã (${nScored} pessoa(s) pontuaram hoje). Curto: 2 a 4 linhas, sem listas, sem repetir os pontos em números e sem título (o bot já coloca o título e os números antes).
+  return `São 6h da manhã. Ontem (${day}) rolou mais um dia da competição aberta de treinos do grupo. Escreva os parabéns para ${nWinners > 1 ? 'as pessoas que empataram com' : 'a pessoa que fez'} a maior pontuação de ontem, chamando pelo nome e comentando as atividades que fez. Depois, em uma frase, convide a turma a buscar o topo hoje (${nScored} pessoa(s) pontuaram ontem). Curto: 2 a 4 linhas, sem listas, sem repetir os pontos em números e sem título (o bot já coloca o título e os números antes).
 
-Maior pontuação do dia:
+Maior pontuação de ontem:
 ${winners}`;
 }

@@ -112,7 +112,7 @@ export function rulesText(ch: Challenge, rules: Rule[]): string {
   }
   if (ch.open_mode) {
     L.push('', '🏆 *Destaque do dia*');
-    L.push(ch.daily_congrats ? '• Todo dia às 23h59 o mascote dá os parabéns a quem mais pontuou no dia.' : '• Os parabéns do dia estão desligados pelos admins.');
+    L.push(ch.daily_congrats ? '• Todo dia às 6h o mascote dá os parabéns a quem mais pontuou no dia anterior.' : '• Os parabéns do dia estão desligados pelos admins.');
     L.push('• Sem duplas nem equipes: cada um pontua por si.');
   } else {
     L.push('', '👥 *Equipes*');
@@ -123,20 +123,7 @@ export function rulesText(ch: Challenge, rules: Rule[]): string {
   }
   L.push('', '🔎 *Revisão*');
   L.push('• Check-ins com dúvida ficam "em revisão" e um admin aprova ou recusa. Você recebe o resultado aqui no grupo.');
-  L.push('', '💬 *Comandos de todos*');
-  L.push('• #ranking - ranking individual', ...(ch.open_mode ? [] : ['• #equipes - ranking das equipes']), '• ?alimento - diz se um alimento é saudável. Ex.: ?granola', '• #motivação - uma palavra do Mestre Splinter para você', '• #agenda - eventos do grupo', '• #regras - estas regras');
-  L.push('', '🛡️ *Comandos dos admins*');
-  L.push('• #inscrever - responda à mensagem com o nome da pessoa. Para corrigir o nome: #inscrever Nome Sobrenome');
-  if (ch.open_mode) {
-    L.push('• #desativarparabens / #ativarparabens - desliga ou liga os parabéns do dia');
-    L.push('• #pararmonitoramento - encerra a competição aberta (inscritos e pontos ficam guardados)');
-  } else {
-    L.push('• #equipe Nome da Equipe @pessoa1 @pessoa2 - monta ou troca uma equipe');
-  }
-  L.push('• #posedodia - mande a foto da pose do dia com essa hashtag (pode escrever o nome da pose junto)');
-  L.push('• #pendentes - lista os check-ins em revisão');
-  L.push('• #aprovar - responda à foto do check-in para aprovar');
-  L.push('• #recusar motivo - responda à foto do check-in para recusar. Ex.: #recusar foto sem a pose');
+  L.push('', ...fitnessCommands(ch));
   if (!ch.open_mode || ch.daily_summary || ch.persona_messages) {
     L.push('', '🐀 O Mestre Splinter manda um resumo às 4h e passa por aqui ao longo do dia para acompanhar o treino dos alunos.');
   }
@@ -153,7 +140,43 @@ export const PAUSED_NOTE = '\n\n⏸️ Competição pausada: as fotos não estã
 
 export const onlyAdmin = (what: string) => `🛡️ Só os admins podem ${what}.`;
 
-/** #ajuda: comandos que valem a qualquer momento, com ou sem desafio. */
+/**
+ * Comandos do tema fitness (check-in, ranking, competição), para o #regras.
+ * Sem desafio (`ch` nulo) mostra como ligar a competição aberta.
+ */
+export function fitnessCommands(ch: Challenge | null): string[] {
+  const open = ch?.open_mode ?? false;
+  const L = ['🏋️ *Comandos do desafio*'];
+  if (open || !ch) L.push('• #ficargostoso / #ficargostosa - entra na competição aberta, a qualquer momento');
+  L.push('• #ranking - ranking individual');
+  if (!open) L.push('• #equipes - ranking das equipes');
+  L.push('• #atividades - mostra quais atividades estão valendo ponto');
+  L.push('• #meulocal Nome - respondendo à sua localização, cadastra seu local de treino');
+  L.push('• #regras - estas regras');
+  L.push('', '🛡️ *Comandos dos admins*');
+  if (!ch || open) L.push('• #monitorartreinos - liga a competição aberta (qualquer um entra, pontos individuais, sem duplas)');
+  if (open || !ch) {
+    L.push('• #pararmonitoramento - encerra a competição aberta (inscritos e pontos ficam guardados)');
+    L.push('• #desativarparabens / #ativarparabens - desliga ou liga os parabéns das 6h para quem mais pontuou no dia anterior');
+  }
+  L.push('• #inscrever - responda à mensagem com o nome da pessoa. Para corrigir o nome: #inscrever Nome Sobrenome');
+  if (!open) L.push('• #equipe Nome da Equipe @pessoa1 @pessoa2 - monta ou troca uma equipe');
+  L.push('• #posedodia - mande a foto da pose do dia com essa hashtag (pode escrever o nome da pose junto)');
+  L.push('• #pendentes - lista os check-ins em revisão');
+  L.push('• #aprovar - responda à foto do check-in para aprovar');
+  L.push('• #recusar motivo - responda à foto do check-in para recusar. Ex.: #recusar foto sem a pose');
+  L.push('• #ativar / #desativar + atividade - liga ou desliga uma atividade. Ex.: #desativar pose, #ativar cardio, #desativar resumo');
+  L.push('• #pausar / #despausar - pausa a competição (fotos não valem ponto) e retoma');
+  L.push('• #reiniciar - zera a pontuação da competição (o bot pergunta 3 vezes antes)');
+  return L;
+}
+
+/** #regras sem nenhum desafio cadastrado. */
+export function noChallengeRules(): string {
+  return ['📋 *Regras*', 'Não há competição rolando neste grupo agora.', '', ...fitnessCommands(null)].join('\n');
+}
+
+/** #ajuda: comandos gerais, que valem a qualquer momento. Os do desafio fitness ficam no #regras. */
 export function helpText(): string {
   return [
     '🐀 *Comandos do Mestre Splinter*',
@@ -178,9 +201,8 @@ export function helpText(): string {
     '• #nascimento + data - registra seu aniversário para ganhar parabéns no dia (ano opcional). Ex.: #nascimento 15/03 (#aniversariantes mostra os do mês)',
     '• #horoscopo - o horóscopo do dia do seu signo (1 por dia). Ou de outro signo: #horoscopo leão',
     '',
-    '🏋️ *Durante o desafio*',
-    '• #regras, #ranking e #equipes',
-    '• #atividades - mostra quais atividades estão valendo ponto',
+    '🏋️ *Desafio fitness*',
+    '• #regras - regras do desafio e todos os comandos de check-in, ranking e competição',
     '',
     '🛡️ *Admins*',
     '• #agendar - responda à sugestão de evento (ou: #agendar Nome | 15/11 19h | Local)',
@@ -196,14 +218,5 @@ export function helpText(): string {
     '• #sumidos - (admins) mostra quem seria avisado agora, sem avisar ninguém',
     '• #carrodoban - (admins) roda agora a verificação de sumidos e aplica os avisos (e remoções)',
     '• #curiar / #nãocuriar - liga ou desliga o pedido de fotos às 10h, 15h e 21h',
-    '• #ativar / #desativar + atividade - liga ou desliga uma atividade do desafio. Ex.: #desativar pose, #ativar cardio, #desativar resumo',
-    '• #pausar / #despausar - pausa a competição (fotos não valem ponto) e retoma',
-    '• #reiniciar - zera a pontuação da competição (o bot pergunta 3 vezes antes)',
-    '',
-    '🔥 *Competição aberta de treinos*',
-    '• #monitorartreinos - (admins) liga a competição aberta: qualquer um entra, pontos individuais, sem duplas',
-    '• #ficargostoso / #ficargostosa - entra na competição aberta, a qualquer momento',
-    '• #desativarparabens / #ativarparabens - (admins) desliga ou liga os parabéns das 23h59 para quem mais pontuou no dia',
-    '• #pararmonitoramento - (admins) encerra a competição aberta (inscritos e pontos ficam guardados)',
   ].join('\n');
 }
