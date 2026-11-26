@@ -37,8 +37,10 @@ export function photoReply(p: {
   return `✅ ${name}, ${category} registrado! +${p.points} ponto(s).`;
 }
 
-export const notEnrolled = (pushName: string) =>
-  `🙋 ${pushName || 'Jovem guerreiro'}, você ainda não está inscrito no desafio. Para entrar, fale com um dos admins do grupo: mande seu nome aqui e um admin faz sua inscrição.`;
+export const notEnrolled = (pushName: string, open = false) =>
+  open
+    ? `🙋 ${pushName || 'Jovem guerreiro'}, você ainda não está na competição. Para entrar, mande *#ficargostoso* ou *#ficargostosa* aqui no grupo e depois mande a foto de novo.`
+    : `🙋 ${pushName || 'Jovem guerreiro'}, você ainda não está inscrito no desafio. Para entrar, fale com um dos admins do grupo: mande seu nome aqui e um admin faz sua inscrição.`;
 
 export const outOfPeriod = (pushName: string, deadline: string) =>
   `⏰ ${pushName}, essa foto chegou fora do período ou depois de ${deadline} e não vale ponto.`;
@@ -78,8 +80,13 @@ export function rulesText(ch: Challenge, rules: Rule[]): string {
   const pose = cats.find((r) => r.kind === 'pose');
   const L: string[] = [];
   L.push(`📋 *Regras - ${ch.name}*`);
-  L.push(`📅 De ${br(ch.starts_on)} a ${br(ch.ends_on)}. O check-in vale até ${ch.checkin_deadline} do mesmo dia.`);
-  L.push('', '📝 *Inscrição*', 'Mande seu nome aqui no grupo. Um admin responde sua mensagem e o bot faz a inscrição.');
+  if (ch.open_mode) {
+    L.push(`📅 Competição aberta, sem data para acabar. O check-in vale até ${ch.checkin_deadline} do mesmo dia.`);
+    L.push('', '📝 *Inscrição*', 'Qualquer pessoa entra a qualquer momento: mande *#ficargostoso* ou *#ficargostosa*.');
+  } else {
+    L.push(`📅 De ${br(ch.starts_on)} a ${br(ch.ends_on)}. O check-in vale até ${ch.checkin_deadline} do mesmo dia.`);
+    L.push('', '📝 *Inscrição*', 'Mande seu nome aqui no grupo. Um admin responde sua mensagem e o bot faz a inscrição.');
+  }
   L.push('', '📸 *Como fazer check-in*', 'Mande uma foto com a hashtag da categoria na legenda:');
   for (const r of cats) L.push(`• ${r.hashtag} - ${r.category}: ${fmt(r.points)} ponto(s)`);
   L.push('Só vale 1 foto por categoria por dia, e foto repetida não conta.');
@@ -103,23 +110,36 @@ export function rulesText(ch: Challenge, rules: Rule[]): string {
     if (ch.ai_photo_check && ch.require_pose)
       L.push('• A IA compara sua foto com a pose do dia. Se ficar diferente, o check-in vai para revisão dos admins.');
   }
-  L.push('', '👥 *Equipes*');
-  L.push(
-    '• Cada dupla soma os pontos dos dois.' +
-      (ch.team_bonus_points > 0 ? ` Quando os dois treinam no mesmo dia, a equipe ganha +${fmt(ch.team_bonus_points)} ponto(s).` : ''),
-  );
+  if (ch.open_mode) {
+    L.push('', '🏆 *Destaque do dia*');
+    L.push(ch.daily_congrats ? '• Todo dia às 23h59 o mascote dá os parabéns a quem mais pontuou no dia.' : '• Os parabéns do dia estão desligados pelos admins.');
+    L.push('• Sem duplas nem equipes: cada um pontua por si.');
+  } else {
+    L.push('', '👥 *Equipes*');
+    L.push(
+      '• Cada dupla soma os pontos dos dois.' +
+        (ch.team_bonus_points > 0 ? ` Quando os dois treinam no mesmo dia, a equipe ganha +${fmt(ch.team_bonus_points)} ponto(s).` : ''),
+    );
+  }
   L.push('', '🔎 *Revisão*');
   L.push('• Check-ins com dúvida ficam "em revisão" e um admin aprova ou recusa. Você recebe o resultado aqui no grupo.');
   L.push('', '💬 *Comandos de todos*');
-  L.push('• #ranking - ranking individual', '• #equipes - ranking das equipes', '• ?alimento - diz se um alimento é saudável. Ex.: ?granola', '• #motivação - uma palavra do Mestre Splinter para você', '• #agenda - eventos do grupo', '• #regras - estas regras');
+  L.push('• #ranking - ranking individual', ...(ch.open_mode ? [] : ['• #equipes - ranking das equipes']), '• ?alimento - diz se um alimento é saudável. Ex.: ?granola', '• #motivação - uma palavra do Mestre Splinter para você', '• #agenda - eventos do grupo', '• #regras - estas regras');
   L.push('', '🛡️ *Comandos dos admins*');
   L.push('• #inscrever - responda à mensagem com o nome da pessoa. Para corrigir o nome: #inscrever Nome Sobrenome');
-  L.push('• #equipe Nome da Equipe @pessoa1 @pessoa2 - monta ou troca uma equipe');
+  if (ch.open_mode) {
+    L.push('• #desativarparabens / #ativarparabens - desliga ou liga os parabéns do dia');
+    L.push('• #pararmonitoramento - encerra a competição aberta (inscritos e pontos ficam guardados)');
+  } else {
+    L.push('• #equipe Nome da Equipe @pessoa1 @pessoa2 - monta ou troca uma equipe');
+  }
   L.push('• #posedodia - mande a foto da pose do dia com essa hashtag (pode escrever o nome da pose junto)');
   L.push('• #pendentes - lista os check-ins em revisão');
   L.push('• #aprovar - responda à foto do check-in para aprovar');
   L.push('• #recusar motivo - responda à foto do check-in para recusar. Ex.: #recusar foto sem a pose');
-  L.push('', '🐀 O Mestre Splinter manda um resumo às 4h e passa por aqui ao longo do dia para acompanhar o treino dos alunos.');
+  if (!ch.open_mode || ch.daily_summary || ch.persona_messages) {
+    L.push('', '🐀 O Mestre Splinter manda um resumo às 4h e passa por aqui ao longo do dia para acompanhar o treino dos alunos.');
+  }
   L.push('', 'Dúvidas ou correção de pontos: fale com um admin.');
   return L.join('\n');
 }
@@ -179,5 +199,11 @@ export function helpText(): string {
     '• #ativar / #desativar + atividade - liga ou desliga uma atividade do desafio. Ex.: #desativar pose, #ativar cardio, #desativar resumo',
     '• #pausar / #despausar - pausa a competição (fotos não valem ponto) e retoma',
     '• #reiniciar - zera a pontuação da competição (o bot pergunta 3 vezes antes)',
+    '',
+    '🔥 *Competição aberta de treinos*',
+    '• #monitorartreinos - (admins) liga a competição aberta: qualquer um entra, pontos individuais, sem duplas',
+    '• #ficargostoso / #ficargostosa - entra na competição aberta, a qualquer momento',
+    '• #desativarparabens / #ativarparabens - (admins) desliga ou liga os parabéns das 23h59 para quem mais pontuou no dia',
+    '• #pararmonitoramento - (admins) encerra a competição aberta (inscritos e pontos ficam guardados)',
   ].join('\n');
 }

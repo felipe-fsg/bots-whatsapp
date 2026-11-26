@@ -28,6 +28,10 @@ export interface Challenge {
   reset_step: number;
   reset_by: string | null;
   reset_asked_at: Date | null;
+  /** Competição aberta (#monitorartreinos): inscrição livre, sem equipes. */
+  open_mode: boolean;
+  /** Parabéns do mascote para quem mais pontuou no dia (só competição aberta). */
+  daily_congrats: boolean;
 }
 
 export interface Rule {

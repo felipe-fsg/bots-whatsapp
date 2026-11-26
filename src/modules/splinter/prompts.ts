@@ -77,3 +77,11 @@ export function motivationPrompt(name: string, hour: number, facts: string): str
 Dados:
 ${facts}`;
 }
+
+/** Parabéns das 23h59 da competição aberta. O cabeçalho com os nomes e pontos vai antes, montado pelo bot. */
+export function congratsPrompt(day: string, winners: string, nWinners: number, nScored: number): string {
+  return `Está terminando o dia ${day} na competição aberta de treinos do grupo. Escreva os parabéns para ${nWinners > 1 ? 'as pessoas que empataram com' : 'a pessoa que fez'} a maior pontuação do dia, chamando pelo nome e comentando as atividades que fez. Depois, em uma frase, convide o resto da turma a tentar amanhã (${nScored} pessoa(s) pontuaram hoje). Curto: 2 a 4 linhas, sem listas, sem repetir os pontos em números e sem título (o bot já coloca o título e os números antes).
+
+Maior pontuação do dia:
+${winners}`;
+}

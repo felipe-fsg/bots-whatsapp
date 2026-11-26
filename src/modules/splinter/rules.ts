@@ -96,11 +96,20 @@ export type Command =
   | { type: 'ativar'; on: boolean; names: string[] }
   | { type: 'pausar'; on: boolean }
   | { type: 'reiniciar' }
-  | { type: 'confirmar'; yes: boolean };
+  | { type: 'confirmar'; yes: boolean }
+  | { type: 'monitorar'; on: boolean }
+  | { type: 'ficargostoso' }
+  | { type: 'parabens'; on: boolean };
 
 /** Comandos de texto. '!' ainda é aceito nos comandos antigos. */
 export function parseCommand(text: string): Command | null {
   const t = text.trim();
+  // competição aberta
+  if (/^#monitorar ?treinos?(?![\p{L}\p{N}])/iu.test(t)) return { type: 'monitorar', on: true };
+  if (/^#(parar|desativar|encerrar) ?(de ?)?monitora(r|mento) ?(os ?)?(treinos?)?(?![\p{L}\p{N}])/iu.test(t)) return { type: 'monitorar', on: false };
+  if (/^#ficar ?gostos[oa](?![\p{L}\p{N}])/iu.test(t)) return { type: 'ficargostoso' };
+  const congrats = /^#(ativar|desativar) ?parab(e|é)ns(?![\p{L}\p{N}])/iu.exec(t);
+  if (congrats) return { type: 'parabens', on: congrats[1]!.toLowerCase() === 'ativar' };
   if (/^[#!]motiva(c|ç)(a|ã)o(?![\p{L}\p{N}])/iu.test(t)) return { type: 'motivacao' };
   if (/^[#!](ajuda|comandos)\b/i.test(t)) return { type: 'ajuda' };
   if (/^[#!]ranking\b/i.test(t)) return { type: 'ranking' };
