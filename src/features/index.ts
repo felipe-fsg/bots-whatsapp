@@ -15,7 +15,8 @@ import { grupo } from './grupo/index.js';
 import { quem } from './quem/index.js';
 import { tarot } from './tarot/index.js';
 import { aniversario } from './aniversario/index.js';
+import { romance } from './romance/index.js';
 
 /** Funções do núcleo. Um módulo pode limitar quais usa (o técnico, grupo profissional, só usa agenda, resumo e pesquisa). */
 // engajamento vem primeiro para contar toda mensagem, inclusive comandos.
-export const features: BotModule[] = [engajamento, suporte, grupo, inativos, boasvindas, agenda, resumo, pesquisa, curiar, admins, instagram, pista, quem, tarot, aniversario, mascote];
+export const features: BotModule[] = [engajamento, suporte, grupo, inativos, boasvindas, agenda, resumo, pesquisa, curiar, admins, instagram, pista, quem, tarot, romance, aniversario, mascote];
